@@ -68,8 +68,10 @@ Or pull the image directly:
 docker run -p 3000:3000 ghcr.io/michael-borck/bowerbird:latest
 ```
 
-Point it at a local [Ollama](https://ollama.com) instance or bring your own
-API key under **Settings → AI provider**. BYO keys are held in browser
+Configuration lives in a `.env` file next to `docker-compose.yml` — copy
+[`.env.example`](.env.example) and fill it in (`OLLAMA_URL`, and
+`OLLAMA_API_KEY` if your Ollama sits behind an authenticating proxy).
+Alternatively, bring your own API key under **Settings → AI provider**. BYO keys are held in browser
 storage and passed per request only — they are **never persisted server-side**
 ([ADR-0004](docs/adr/0004-byok-keys-never-persisted-server-side.md)).
 

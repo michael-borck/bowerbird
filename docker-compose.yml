@@ -5,12 +5,16 @@ services:
     image: ghcr.io/michael-borck/bowerbird:latest
     ports:
       - "3000:3000"
+    # Values come from a .env file next to this compose file — copy
+    # .env.example to .env and fill it in. Keep .env out of git (chmod 600).
     environment:
       - PORT=3000
       - REDIS_URL=redis://redis:6379
       # Point at your own Ollama instance, or configure a BYO key in the UI.
-      # BYO keys are never persisted server-side (ADR-0004).
+      # BYO keys are never persisted server-side (ADR-0004); this bearer key
+      # is the server's own service credential for its Ollama instance.
       - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
     depends_on:
       - redis
     restart: unless-stopped

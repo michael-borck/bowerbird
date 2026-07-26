@@ -2,11 +2,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { suggestResources } from '@michaelborck/bowerbird-core';
+import { loadConfig } from './config.js';
 
+const config = loadConfig();
 const app = express();
 app.use(express.json({ limit: '10mb' }));
-
-const port = Number(process.env.PORT ?? 3000);
 
 // Component health is surfaced to the UI per ADR-0006.
 app.get('/api/health', (_req, res) => {
@@ -16,7 +16,7 @@ app.get('/api/health', (_req, res) => {
     components: {
       verification: 'ok',
       thumbnails: 'ok',
-      llm: 'unavailable',
+      llm: config.ollamaUrl ? 'configured' : 'unavailable',
       queue: 'unavailable',
     },
   });
@@ -45,6 +45,6 @@ app.get('*', (_req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`bowerbird server listening on :${port}`);
+app.listen(config.port, () => {
+  console.log(`bowerbird server listening on :${config.port}`);
 });
