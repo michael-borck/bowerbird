@@ -15,13 +15,23 @@ self-host story is "run exactly what production runs".
 ## Decision
 
 - **App:** one Docker image (server + built web UI) run on a VPS at
-  `bowerbird.eduserver.au`, orchestrated with `docker-compose.yml`
+  `app.bowerbird.eduserver.au`, orchestrated with `docker-compose.yml`
   (app + Redis for BullMQ, optional Ollama service). Images are published to
   GHCR (and optionally Docker Hub) by the release workflow.
 - **Landing page:** static site in `site/`, deployed to GitHub Pages by a
-  workflow on every push to `main`. The landing page's "Try it" button links
-  to the VPS instance; download buttons link to GitHub Releases; the
-  self-host section shows the `docker run` / `docker compose` commands.
+  workflow on every push to `main`, served at the root domain
+  `bowerbird.eduserver.au` (custom domain on Pages). The landing page's
+  "Try it" button links to the app subdomain; download buttons link to
+  GitHub Releases; the self-host section shows the `docker run` /
+  `docker compose` commands.
+
+**Domain scheme:** marketing at the root, app at `app.*`. The brand URL
+(`bowerbird.eduserver.au`) is the one told to colleagues and printed on
+slides; it stays up during VPS outages and survives either side changing
+hosts. DNS: root is a CNAME to `michael-borck.github.io`; `app.` is an A
+record to the VPS. Let's Encrypt issues per-host certs at this depth — a
+`*.eduserver.au` wildcard would not cover `app.bowerbird`, so the VPS proxy
+(e.g. Caddy) obtains its own cert.
 
 ## Consequences
 

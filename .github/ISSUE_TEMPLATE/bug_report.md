@@ -14,7 +14,7 @@ labels: bug
 
 **Where are you running Bowerbird?**
 
-- [ ] Hosted (bowerbird.eduserver.au)
+- [ ] Hosted (app.bowerbird.eduserver.au)
 - [ ] Self-hosted Docker
 - [ ] Desktop app
 - [ ] CLI

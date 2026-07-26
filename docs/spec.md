@@ -4,7 +4,7 @@
 **Date:** 26 July 2026
 **Repo:** `bowerbird`
 **Package:** `@michaelborck/bowerbird`
-**Host:** `bowerbird.eduserver.au`
+**Host:** `app.bowerbird.eduserver.au` (landing page at `bowerbird.eduserver.au`)
 
 > Bowerbird finds and verifies supporting resources for your teaching.
 
@@ -194,7 +194,7 @@ become the reading list's biases.
 |---|---|---|
 | CLI | npm global install | v1 |
 | Library | npm package | v1 |
-| Web UI | Hosted at bowerbird.eduserver.au | v1 |
+| Web UI | Hosted at app.bowerbird.eduserver.au | v1 |
 | Docker | Image with web UI bundled, Docker Hub + GHCR | v1 |
 | Desktop | Installers with auto-update, signed and notarised | v1 or v1.1 |
 | PWA | Same web UI, manifest and service worker | v1.1 |

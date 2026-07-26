@@ -8,7 +8,7 @@ research papers, white papers and consultant reports. Every returned resource
 is **verified to exist** and presented with enough context for a human to
 judge it quickly.
 
-**[Try the hosted version](https://bowerbird.eduserver.au)** · **[Download the desktop app](https://github.com/michael-borck/bowerbird/releases/latest)** · **[Self-host with Docker](#self-hosting)**
+**[Try the hosted version](https://app.bowerbird.eduserver.au)** · **[Download the desktop app](https://github.com/michael-borck/bowerbird/releases/latest)** · **[Self-host with Docker](#self-hosting)**
 
 ---
 
@@ -34,7 +34,7 @@ handing you an answer to paste.
 
 | You are | Use | Get it |
 |---|---|---|
-| A colleague or student | Hosted web UI | [bowerbird.eduserver.au](https://bowerbird.eduserver.au) |
+| A colleague or student | Hosted web UI | [app.bowerbird.eduserver.au](https://app.bowerbird.eduserver.au) |
 | A power user | Desktop app | [Latest release](https://github.com/michael-borck/bowerbird/releases/latest) |
 | Self-hosting | Docker | [See below](#self-hosting) |
 | Scripting / batch | CLI | `npm install -g @michaelborck/bowerbird-cli` |
