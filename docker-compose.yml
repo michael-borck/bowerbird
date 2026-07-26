@@ -1,0 +1,33 @@
+# Self-host deployment: the same image production runs (ADR-0008).
+services:
+  app:
+    build: .
+    image: ghcr.io/michael-borck/bowerbird:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+      # Point at your own Ollama instance, or configure a BYO key in the UI.
+      # BYO keys are never persisted server-side (ADR-0004).
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  # Uncomment to run Ollama in the same stack (needs ~8 GB RAM for an 8B model):
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   restart: unless-stopped
+
+volumes:
+  redis-data:
+  # ollama-data:

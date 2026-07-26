@@ -1,0 +1,25 @@
+{
+  "name": "@michaelborck/bowerbird-core",
+  "version": "0.1.0",
+  "description": "Bowerbird core: retrieval, verification, ranking and rationale. No UI assumptions.",
+  "license": "MIT",
+  "author": "Michael Borck",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/michael-borck/bowerbird.git",
+    "directory": "packages/core"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test --experimental-strip-types src/*.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

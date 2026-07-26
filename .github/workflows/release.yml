@@ -1,0 +1,128 @@
+# Release pipeline (pattern copied from cite-sight): a v* tag triggers
+# npm publish, multi-arch Docker images, and (once the shell is chosen,
+# ADR-0007) desktop installers.
+#
+# Secrets expected (add under Settings → Secrets and variables → Actions):
+#   NPM_TOKEN            npm automation token for @michaelborck/* publishes
+#   DOCKERHUB_USERNAME   optional — Docker Hub mirror of the GHCR image
+#   DOCKERHUB_TOKEN      optional — Docker Hub access token
+# GHCR pushes use the built-in GITHUB_TOKEN; no secret needed.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  npm-publish:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build
+      - name: Publish core
+        if: env.NPM_TOKEN != ''
+        run: npm publish --access public -w @michaelborck/bowerbird-core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish CLI
+        if: env.NPM_TOKEN != ''
+        run: npm publish --access public -w @michaelborck/bowerbird-cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Skipped (no NPM_TOKEN configured)
+        if: env.NPM_TOKEN == ''
+        run: echo "NPM_TOKEN not set — skipping npm publish."
+
+  docker:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/michael-borck/bowerbird
+            ${{ env.DOCKERHUB_USERNAME != '' && 'docker.io/michaelborck/bowerbird' || '' }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # Desktop installers are disabled until the shell is chosen (ADR-0007).
+  # When enabled: build per-OS installers, sign and notarise (needs
+  # APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / CSC_* secrets), attach to the
+  # release, and wire auto-update.
+  desktop:
+    if: false
+    needs: build-and-test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    steps:
+      - run: echo "Enable once the desktop shell is chosen (ADR-0007)."
+
+  github-release:
+    needs: [docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

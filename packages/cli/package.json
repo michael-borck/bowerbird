@@ -1,0 +1,29 @@
+{
+  "name": "@michaelborck/bowerbird-cli",
+  "version": "0.1.0",
+  "description": "Bowerbird CLI: verified teaching resources from your terminal.",
+  "license": "MIT",
+  "author": "Michael Borck",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/michael-borck/bowerbird.git",
+    "directory": "packages/cli"
+  },
+  "type": "module",
+  "bin": {
+    "bowerbird": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@michaelborck/bowerbird-core": "0.1.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

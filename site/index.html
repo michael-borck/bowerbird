@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bowerbird — verified supporting resources for your teaching</title>
+<meta name="description" content="Give Bowerbird a topic or a document and get back verified videos, papers, podcasts and reports — every link checked, every DOI validated, with a teaching rationale for each.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🪶</text></svg>">
+<style>
+  :root {
+    --bg: #0b1020;
+    --bg-soft: #111832;
+    --card: #151d3b;
+    --line: #26305a;
+    --text: #e8ecf8;
+    --muted: #9aa5c8;
+    --blue: #5b8cff;
+    --blue-2: #7fb2ff;
+    --violet: #8f6fff;
+    --ok: #4fd1a1;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--blue-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(11,16,32,.85); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  nav { display: flex; align-items: center; gap: 24px; padding: 14px 0; }
+  .brand { font-weight: 700; font-size: 1.15rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .brand:hover { text-decoration: none; }
+  nav .links { margin-left: auto; display: flex; gap: 20px; font-size: .95rem; }
+
+  .hero { padding: 96px 0 72px; text-align: center;
+    background:
+      radial-gradient(600px 300px at 50% -50px, rgba(91,140,255,.25), transparent),
+      radial-gradient(500px 260px at 80% 30%, rgba(143,111,255,.12), transparent);
+  }
+  .hero h1 { font-size: clamp(2.2rem, 5.5vw, 3.6rem); line-height: 1.15; letter-spacing: -.02em; }
+  .hero h1 .grad {
+    background: linear-gradient(90deg, var(--blue), var(--violet));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.lead { max-width: 640px; margin: 20px auto 0; color: var(--muted); font-size: 1.15rem; }
+  .cta { margin-top: 36px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 13px 26px; border-radius: 10px;
+    font-weight: 600; font-size: 1rem; transition: transform .12s, box-shadow .12s;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+  .btn-primary {
+    background: linear-gradient(90deg, var(--blue), var(--violet)); color: #fff;
+    box-shadow: 0 8px 28px rgba(91,140,255,.35);
+  }
+  .btn-ghost { border: 1px solid var(--line); color: var(--text); background: var(--bg-soft); }
+  .cta-note { margin-top: 14px; color: var(--muted); font-size: .9rem; }
+
+  section { padding: 72px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 1.9rem; letter-spacing: -.01em; margin-bottom: 10px; }
+  .kicker { color: var(--blue-2); text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; font-weight: 700; }
+  .sub { color: var(--muted); max-width: 640px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-top: 34px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+  .card h3 { font-size: 1.05rem; margin-bottom: 8px; }
+  .card p { color: var(--muted); font-size: .95rem; }
+  .card .icon { font-size: 1.5rem; margin-bottom: 12px; display: block; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 30px; font-size: .95rem; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--blue-2); font-weight: 600; }
+  td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; }
+  td { color: var(--muted); }
+  .table-scroll { overflow-x: auto; }
+  .yes { color: var(--ok); font-weight: 600; }
+
+  pre {
+    background: #0a0f22; border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; overflow-x: auto; margin-top: 22px;
+    font-size: .92rem; line-height: 1.7;
+  }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #cfe0ff; }
+  .comment { color: #5f6c99; }
+
+  .deploy-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 34px; }
+
+  footer { border-top: 1px solid var(--line); padding: 36px 0 48px; color: var(--muted); font-size: .9rem; }
+  footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <a class="brand" href="#">🪶 Bowerbird</a>
+      <div class="links">
+        <a href="#different">Why Bowerbird</a>
+        <a href="#tiers">Tiers</a>
+        <a href="#selfhost">Self-host</a>
+        <a href="https://github.com/michael-borck/bowerbird">GitHub</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>Supporting resources for your teaching,<br><span class="grad">verified before you see them.</span></h1>
+    <p class="lead">
+      Give Bowerbird a topic, a worksheet or a reading. Get back videos, papers,
+      podcasts and reports — every link resolved, every DOI validated, each with
+      a rationale for why it belongs in your unit.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://bowerbird.eduserver.au">Try it — no install</a>
+      <a class="btn btn-ghost" href="https://github.com/michael-borck/bowerbird/releases/latest">Download desktop app</a>
+      <a class="btn btn-ghost" href="#selfhost">Self-host</a>
+    </div>
+    <p class="cta-note">Free hosted tier · Open source (MIT) · Your own machine, your own model if you want</p>
+  </div>
+</div>
+
+<section id="different">
+  <div class="wrap">
+    <div class="kicker">Why Bowerbird</div>
+    <h2>Retrieval is a commodity. Judgement support isn't.</h2>
+    <p class="sub">
+      Perplexity, NotebookLM, Elicit and Consensus already turn topics into
+      sources. Bowerbird is built for the part that happens after retrieval —
+      the part a lecturer actually spends time on.
+    </p>
+    <div class="grid">
+      <div class="card">
+        <span class="icon">✅</span>
+        <h3>Verified, never generated</h3>
+        <p>Every link is resolved and every DOI validated against Crossref,
+        Semantic Scholar and OpenAlex. Paywalled is distinguished from dead.
+        A hallucinated citation is impossible by construction, because nothing
+        is generated — only retrieved and checked.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🏛️</span>
+        <h3>Institutional plumbing</h3>
+        <p>Licensing status (OER, Creative Commons, library-subscription),
+        accessibility notes like captions and tagged PDFs, and LMS-ready
+        export. The admin work you'd otherwise do by hand.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🎓</span>
+        <h3>Pedagogical framing</h3>
+        <p>A rationale per suggestion — why this one, what it adds, what it
+        doesn't cover. Source-type labels (peer-reviewed, practitioner, vendor,
+        journalism, government) and a <em>commercially-interested</em> flag on
+        consultant material, which is itself a teaching moment.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🌏</span>
+        <h3>Deliberately diverse results</h3>
+        <p>Balanced by format and voice on purpose: one video, one paper, one
+        practitioner piece, an explicit pass for non-Anglo sources — not five
+        similar US blog posts. The retrieval layer's biases shouldn't become
+        your reading list's biases.</p>
+      </div>
+      <div class="card">
+        <span class="icon">👀</span>
+        <h3>Visual triage</h3>
+        <p>Thumbnails for every result so you can spot the cookie wall, the
+        login gate, the parked domain and the SEO farm at a glance — before
+        you click.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🔓</span>
+        <h3>Yours to run</h3>
+        <p>Open source, MIT licensed. Run it hosted, in Docker on your own
+        server, or as a desktop app with a fully local LLM via Ollama — your
+        teaching content never has to leave your machine.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tiers">
+  <div class="wrap">
+    <div class="kicker">Tiers</div>
+    <h2>Free hosted, or take it home</h2>
+    <p class="sub">The hosted tier is genuinely free — inference is self-hosted,
+    so the only constraint is fair-share concurrency, not a per-token bill.</p>
+    <div class="table-scroll">
+      <table>
+        <tr><th></th><th>Free hosted</th><th>Self-host / Desktop</th></tr>
+        <tr><td>Input</td><td>One topic or document</td><td>Batch: a semester of topics at once</td></tr>
+        <tr><td>Verification</td><td class="yes">Yes — always</td><td class="yes">Yes — always</td></tr>
+        <tr><td>Thumbnails</td><td>oEmbed and og:image</td><td>Full page screenshots</td></tr>
+        <tr><td>LLM</td><td>Quota'd, or bring your own key</td><td>Local Ollama, or your own key</td></tr>
+        <tr><td>Export</td><td>Markdown</td><td>Markdown, LMS HTML, reading lists, citations</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="selfhost">
+  <div class="wrap">
+    <div class="kicker">Run it yourself</div>
+    <h2>Self-host in one command</h2>
+    <p class="sub">The Docker image is the exact build the hosted service runs:
+    web UI and server in one container. Bring-your-own API keys are never
+    stored server-side — browser storage only, passed per request.</p>
+    <pre><code><span class="comment"># Quick start</span>
+docker run -p 3000:3000 ghcr.io/michael-borck/bowerbird:latest
+
+<span class="comment"># Or with the queue and an optional local Ollama:</span>
+git clone https://github.com/michael-borck/bowerbird.git
+cd bowerbird
+docker compose up -d</code></pre>
+    <div class="deploy-cols">
+      <div class="card">
+        <h3>🖥️ Desktop app</h3>
+        <p>Batch runs, full screenshots, local model, no quotas.
+        <a href="https://github.com/michael-borck/bowerbird/releases/latest">Grab the latest installer</a>
+        for macOS, Windows or Linux.</p>
+      </div>
+      <div class="card">
+        <h3>⌨️ CLI &amp; library</h3>
+        <p><code>npm install -g @michaelborck/bowerbird-cli</code> for
+        scripting and batch, or build on
+        <code>@michaelborck/bowerbird-core</code> directly.</p>
+      </div>
+      <div class="card">
+        <h3>🐳 Docker images</h3>
+        <p>Multi-arch (amd64 / arm64) images on
+        <a href="https://github.com/michael-borck/bowerbird/pkgs/container/bowerbird">GHCR</a>,
+        tagged per release.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>🪶 Bowerbird — MIT licensed, built by <a href="https://github.com/michael-borck">Michael Borck</a></div>
+    <div>
+      <a href="https://bowerbird.eduserver.au">Hosted app</a> ·
+      <a href="https://github.com/michael-borck/bowerbird">Source</a> ·
+      <a href="https://github.com/michael-borck/bowerbird/blob/main/docs/spec.md">Spec</a> ·
+      <a href="https://github.com/michael-borck/bowerbird/issues">Issues</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
