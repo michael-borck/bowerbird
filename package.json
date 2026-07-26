@@ -16,7 +16,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @michaelborck/bowerbird-core && npm run build -w @michaelborck/bowerbird-cli -w @michaelborck/bowerbird-server -w @michaelborck/bowerbird-web",
+    "build": "npm run build -w @michaelborck/bowerbird-core && npm run build -w @michaelborck/bowerbird-cli -w @michaelborck/bowerbird-server -w @michaelborck/bowerbird-web && npm run build -w @michaelborck/bowerbird-desktop",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "dev:server": "npm run dev -w @michaelborck/bowerbird-server",

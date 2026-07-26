@@ -1,0 +1,29 @@
+appId: com.michaelborck.bowerbird
+productName: Bowerbird
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**/*
+  - package.json
+publish:
+  provider: github
+# electron-builder's own notarize wrapper has been buggy across 24.x/26.x
+# (pattern from cite-sight). We disable it (notarize: false) and notarise
+# the .app from afterSign. DMG signing/notarisation is handled by a workflow
+# step (see release.yml), because it needs keychain access that's no longer
+# available by the time afterAllArtifactBuild fires.
+afterSign: ./scripts/notarize.cjs
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  category: public.app-category.education
+  hardenedRuntime: true
+  notarize: false
+win:
+  target: nsis
+linux:
+  target: AppImage

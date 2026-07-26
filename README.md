@@ -97,7 +97,7 @@ bowerbird/
 │   ├── cli/         Commander.js CLI
 │   ├── server/      Express + BullMQ queue
 │   ├── web/         React + Vite (also the PWA)
-│   └── desktop/     shell wrapping the web UI (deferred — see ADR-0007)
+│   └── desktop/     Electron shell wrapping the web UI (ADR-0010)
 ├── Dockerfile
 ├── docker-compose.yml
 └── package.json     workspace root

@@ -1,8 +1,11 @@
 # Bowerbird self-host image: server + built web UI in one container (ADR-0008).
 FROM node:22-alpine AS build
 WORKDIR /app
+# The desktop workspace pulls in Electron; its binary is useless in a
+# server image, so skip the download.
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 COPY . .
-RUN npm install && npm run build
+RUN npm install && npm run build -w @michaelborck/bowerbird-core -w @michaelborck/bowerbird-server && npm run build -w @michaelborck/bowerbird-web
 
 FROM node:22-alpine
 WORKDIR /app

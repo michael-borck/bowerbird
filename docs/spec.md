@@ -250,7 +250,8 @@ the UI.
    `michael-borck/lens-analysers`; `document-lens` references
    `michael-borck/document-analyser`. Confirm before either is cited as a
    dependency.
-3. **Whether the desktop shell is Electron or Tauri**, deferred per section 11.
+3. ~~Whether the desktop shell is Electron or Tauri~~ — resolved: Electron
+   (see ADR-0010).
 4. **Whether to log anything about usage.** Cheap to add now, annoying to
    retrofit. Only matters if a study might later be extracted from how
    colleagues actually use the tool.

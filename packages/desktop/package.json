@@ -1,0 +1,29 @@
+{
+  "name": "@michaelborck/bowerbird-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bowerbird Desktop — Electron shell wrapping the web UI (ADR-0010).",
+  "license": "MIT",
+  "author": "Michael Borck",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/michael-borck/bowerbird.git",
+    "directory": "packages/desktop"
+  },
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-web.mjs",
+    "start": "electron .",
+    "package": "electron-builder"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "@electron/notarize": "^2.5.0",
+    "electron": "42.0.1",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.5.0"
+  }
+}

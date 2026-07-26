@@ -1,6 +1,6 @@
 # 0007. Defer the desktop shell choice (Electron vs Tauri)
 
-**Status:** Accepted
+**Status:** Superseded by [0010](0010-electron-desktop-shell.md)
 **Date:** 2026-07-26
 
 ## Context

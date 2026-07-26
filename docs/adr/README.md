@@ -15,9 +15,10 @@ old one.
 | [0004](0004-byok-keys-never-persisted-server-side.md) | BYOK keys are never persisted server-side | Accepted |
 | [0005](0005-layered-thumbnails-cheapest-first.md) | Layered thumbnails, cheapest first | Accepted |
 | [0006](0006-non-fatal-degradation.md) | Degradation is non-fatal | Accepted |
-| [0007](0007-defer-desktop-shell-choice.md) | Defer the desktop shell choice (Electron vs Tauri) | Accepted |
+| [0007](0007-defer-desktop-shell-choice.md) | Defer the desktop shell choice (Electron vs Tauri) | Superseded by 0010 |
 | [0008](0008-hosting-vps-docker-plus-github-pages.md) | Hosting: VPS Docker for the app, GitHub Pages for the landing page | Accepted |
 | [0009](0009-list-mode-first-interview-mode-deferred.md) | List mode first; interview mode deferred to v2 | Accepted |
+| [0010](0010-electron-desktop-shell.md) | Electron for the desktop shell | Accepted |
 
 ## Adding an ADR
 

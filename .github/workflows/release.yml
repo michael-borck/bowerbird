@@ -113,26 +113,125 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # Desktop installers are disabled until the shell is chosen (ADR-0007).
-  # When enabled: build per-OS installers, sign and notarise (needs
-  # APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / CSC_* secrets), attach to the
-  # release, and wire auto-update.
+  # Electron desktop installers (ADR-0010). Pipeline copied from cite-sight,
+  # including its keychain and notarisation workarounds.
   desktop:
-    if: false
     needs: build-and-test
-    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
     steps:
-      - run: echo "Enable once the desktop shell is chosen (ADR-0007)."
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      # Persistent keychain so codesign can still find the Developer ID
+      # identity AFTER electron-builder finishes (the keychain it imports
+      # CSC_LINK into is torn down once its own signing step completes).
+      - name: Set up signing keychain (macOS)
+        if: matrix.os == 'macos-latest'
+        env:
+          CSC_LINK_B64: ${{ secrets.APPLE_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -e
+          echo "$CSC_LINK_B64" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p actions build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+          rm /tmp/cert.p12
+          security find-identity -v -p codesigning
+
+      - name: Package Electron app
+        working-directory: packages/desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # NOTARIZE_APPLE_* (not APPLE_*) so electron-builder's broken
+          # auto-notarize wrapper doesn't fire alongside our afterSign hook.
+          NOTARIZE_APPLE_ID: ${{ secrets.APPLE_ID }}
+          NOTARIZE_APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          NOTARIZE_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        # macOS publishes after we've signed + notarised the DMG container
+        # (next step). Other platforms publish straight from electron-builder.
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            npx electron-builder --${{ matrix.platform }} --publish=never
+          else
+            npx electron-builder --${{ matrix.platform }} --publish=always
+          fi
+
+      - name: Sign + notarise + staple DMGs (macOS)
+        if: matrix.os == 'macos-latest'
+        working-directory: packages/desktop
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PWD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -e
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -1)
+          if [ -z "$IDENTITY" ]; then
+            echo "Error: no Developer ID Application identity in keychain"; exit 1
+          fi
+          echo "Identity: $IDENTITY"
+          for dmg in release/*.dmg; do
+            echo "=== $dmg ==="
+            codesign --sign "$IDENTITY" --timestamp "$dmg"
+            xcrun notarytool submit "$dmg" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PWD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+            xcrun stapler staple "$dmg"
+          done
+
+      - name: Upload macOS artifacts to release
+        if: matrix.os == 'macos-latest'
+        working-directory: packages/desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Linux/Windows jobs may run faster and create the draft release first.
+          # If it doesn't exist yet, create it (still draft until github-release).
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --draft --title "$TAG" --notes ""
+          gh release upload "$TAG" --clobber \
+            release/*.dmg \
+            release/*.dmg.blockmap \
+            release/*-mac.zip \
+            release/*-mac.zip.blockmap \
+            release/latest-mac.yml
 
   github-release:
-    needs: [docker]
+    needs: [docker, desktop]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create GitHub release
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          draft: false
           generate_release_notes: true
