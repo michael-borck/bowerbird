@@ -27,3 +27,6 @@ win:
   target: nsis
 linux:
   target: AppImage
+  # Without this, electron-builder derives the executable name from the npm
+  # package name and the @scope makes an invalid AppImage path.
+  executableName: bowerbird

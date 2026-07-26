@@ -1,6 +1,6 @@
 {
   "name": "@michaelborck/bowerbird-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Bowerbird server: exposes core over JSON, queues long work with BullMQ.",
   "license": "MIT",
@@ -12,7 +12,7 @@
     "dev": "node --watch --experimental-strip-types src/index.ts"
   },
   "dependencies": {
-    "@michaelborck/bowerbird-core": "0.1.0",
+    "@michaelborck/bowerbird-core": "0.1.1",
     "express": "^4.19.0"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 {
   "name": "@michaelborck/bowerbird-web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Bowerbird web UI (React + Vite). Also the future PWA.",
   "license": "MIT",
