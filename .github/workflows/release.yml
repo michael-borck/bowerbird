@@ -13,8 +13,8 @@
 #   APPLE_CERTIFICATE_PASSWORD  password for the .p12                        [set]
 #   APPLE_SIGNING_IDENTITY      "Developer ID Application: Michael Borck (H7XP9TYKB5)"  [set]
 #   APPLE_TEAM_ID               H7XP9TYKB5                                   [set]
-#   APPLE_ID                    Apple ID email for notarytool                [todo]
-#   APPLE_APP_SPECIFIC_PASSWORD app-specific password from account.apple.com [todo]
+#   APPLE_ID                    Apple ID email for notarytool                [set]
+#   APPLE_APP_SPECIFIC_PASSWORD app-specific password from account.apple.com [set]
 # Electron mapping if that shell is chosen: CSC_LINK=APPLE_CERTIFICATE,
 # CSC_KEY_PASSWORD=APPLE_CERTIFICATE_PASSWORD; Tauri uses these names as-is.
 name: Release
