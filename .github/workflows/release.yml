@@ -7,6 +7,16 @@
 #   DOCKERHUB_USERNAME   optional — Docker Hub mirror of the GHCR image
 #   DOCKERHUB_TOKEN      optional — Docker Hub access token
 # GHCR pushes use the built-in GITHUB_TOKEN; no secret needed.
+#
+# macOS signing/notarisation (for the desktop job once enabled, ADR-0007):
+#   APPLE_CERTIFICATE           base64 .p12: Developer ID Application + key  [set]
+#   APPLE_CERTIFICATE_PASSWORD  password for the .p12                        [set]
+#   APPLE_SIGNING_IDENTITY      "Developer ID Application: Michael Borck (H7XP9TYKB5)"  [set]
+#   APPLE_TEAM_ID               H7XP9TYKB5                                   [set]
+#   APPLE_ID                    Apple ID email for notarytool                [todo]
+#   APPLE_APP_SPECIFIC_PASSWORD app-specific password from account.apple.com [todo]
+# Electron mapping if that shell is chosen: CSC_LINK=APPLE_CERTIFICATE,
+# CSC_KEY_PASSWORD=APPLE_CERTIFICATE_PASSWORD; Tauri uses these names as-is.
 name: Release
 
 on:
