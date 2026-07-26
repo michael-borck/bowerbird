@@ -1,0 +1,6 @@
+# Dev override: build the image from the local source tree instead of
+# pulling from GHCR. Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  app:
+    build: .

@@ -219,9 +219,10 @@
     <pre><code><span class="comment"># Quick start</span>
 docker run -p 3000:3000 ghcr.io/michael-borck/bowerbird:latest
 
-<span class="comment"># Or with the queue and an optional local Ollama:</span>
-git clone https://github.com/michael-borck/bowerbird.git
-cd bowerbird
+<span class="comment"># Or the full stack — just two files, no source checkout:</span>
+mkdir bowerbird &amp;&amp; cd bowerbird
+curl -fsSLO https://raw.githubusercontent.com/michael-borck/bowerbird/main/docker-compose.yml
+curl -fsSL -o .env https://raw.githubusercontent.com/michael-borck/bowerbird/main/.env.example
 docker compose up -d</code></pre>
     <div class="deploy-cols">
       <div class="card">

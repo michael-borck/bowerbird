@@ -53,19 +53,29 @@ handing you an answer to paste.
 ## Self-hosting
 
 The self-host deployment is the same web UI, bundled into a single Docker
-image with the server:
+image with the server. No source checkout needed — the server only needs the
+compose file and a `.env`:
 
 ```bash
-git clone https://github.com/michael-borck/bowerbird.git
-cd bowerbird
+mkdir -p /opt/bowerbird && cd /opt/bowerbird
+curl -fsSLO https://raw.githubusercontent.com/michael-borck/bowerbird/main/docker-compose.yml
+curl -fsSL -o .env https://raw.githubusercontent.com/michael-borck/bowerbird/main/.env.example
+chmod 600 .env   # then edit: OLLAMA_URL, OLLAMA_API_KEY
 docker compose up -d
 # open http://localhost:3000
 ```
 
-Or pull the image directly:
+Updating is `docker compose pull && docker compose up -d`. To try it without
+the queue, run the image directly:
 
 ```bash
 docker run -p 3000:3000 ghcr.io/michael-borck/bowerbird:latest
+```
+
+To build the image from source instead of pulling from GHCR:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 Configuration lives in a `.env` file next to `docker-compose.yml` — copy

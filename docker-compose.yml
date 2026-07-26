@@ -1,7 +1,10 @@
 # Self-host deployment: the same image production runs (ADR-0008).
+# Standalone by design — curl this file plus .env.example onto a server
+# and `docker compose up -d`; no source checkout needed. To build from
+# source instead, add the dev override:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 services:
   app:
-    build: .
     image: ghcr.io/michael-borck/bowerbird:latest
     ports:
       - "3000:3000"
