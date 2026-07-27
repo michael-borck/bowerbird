@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-27
+
+### Added
+
+- BullMQ queue on the server: suggest requests run through Redis-backed
+  workers (SUGGEST_CONCURRENCY, default 2) so one long generation cannot
+  block the box; inline fallback when Redis is down. BYO-key requests
+  bypass the queue so user keys never touch Redis (ADR-0004).
+- Document upload in the web UI via `/api/extract` (PDF, DOCX, TXT, MD).
+- Query derivation for document input: LLM keyword extraction with a
+  phrase-frequency heuristic fallback that filters course-material
+  boilerplate.
+
+### Changed
+
+- Paper retrieval now uses OpenAlex phrase-quoted title/abstract search
+  with reconstructed abstracts, replacing plain relevance search that
+  surfaced mega-cited off-topic works; Crossref remains the fallback.
+- Open Library book search uses the same phrase-quoted strategy.
+
 ## [0.2.0] - 2026-07-27
 
 ### Added

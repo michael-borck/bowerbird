@@ -11,6 +11,7 @@ import { classifySource } from './enrich/sourceType.js';
 import { fetchPageMeta } from './enrich/page.js';
 import { annotate } from './annotate/ladder.js';
 import { diversify } from './rank/diversity.js';
+import { deriveQuery } from './retrieval/query.js';
 
 const DEFAULT_MAX_RESULTS = 10;
 const ANNOTATE_CONCURRENCY = 3;
@@ -25,10 +26,14 @@ export async function suggestResources(
   request: SuggestRequest,
   config: PipelineConfig = {},
 ): Promise<SuggestResult> {
-  const topic = request.input.trim();
-  if (!topic) return { resources: [], componentHealth: {} };
+  const input = request.input.trim();
+  if (!input) return { resources: [], componentHealth: {} };
   const maxResults = request.maxResults ?? DEFAULT_MAX_RESULTS;
   const health: Record<string, ComponentState> = {};
+
+  // A pasted document is not a search query; derive one (LLM preferred,
+  // term-frequency fallback). Short inputs pass through unchanged.
+  const topic = await deriveQuery(input, config);
 
   // --- Retrieve, one component per source type -------------------------
   const sources: Array<[string, Promise<Candidate[]> | null]> = [

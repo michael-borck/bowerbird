@@ -33,12 +33,27 @@ const VERIFY_COLOR: Record<string, string> = {
 
 export function App() {
   const [topic, setTopic] = useState('');
+  const [doc, setDoc] = useState<{ name: string; text: string } | null>(null);
   const [result, setResult] = useState<SuggestResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  async function uploadDoc(file: File) {
+    setError(null);
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch('/api/extract', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setDoc({ name: data.fileName, text: data.text });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed');
+    }
+  }
+
   async function run() {
-    const input = topic.trim();
+    const input = doc ? doc.text : topic.trim();
     if (!input || loading) return;
     setLoading(true);
     setError(null);
@@ -62,7 +77,7 @@ export function App() {
     const res = await fetch('/api/suggest', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input: topic.trim(), format: 'markdown' }),
+      body: JSON.stringify({ input: doc ? doc.text : topic.trim(), format: 'markdown' }),
     });
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -79,21 +94,42 @@ export function App() {
         Verified supporting resources for your teaching — every link checked, nothing generated.
       </p>
 
-      <div style={{ display: 'flex', gap: 8, margin: '1.5rem 0' }}>
+      <div style={{ display: 'flex', gap: 8, margin: '1.5rem 0 0.5rem' }}>
         <input
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && run()}
-          placeholder="Topic, e.g. supply chain resilience"
+          placeholder={doc ? `Using document: ${doc.name}` : 'Topic, e.g. supply chain resilience'}
+          disabled={Boolean(doc)}
           style={{ flex: 1, padding: '10px 14px', fontSize: 16, borderRadius: 8, border: '1px solid #bbb' }}
         />
         <button
           onClick={run}
-          disabled={loading || !topic.trim()}
+          disabled={loading || (!doc && !topic.trim())}
           style={{ padding: '10px 22px', fontSize: 16, borderRadius: 8, border: 'none', background: '#4054b2', color: '#fff', cursor: 'pointer' }}
         >
           {loading ? 'Searching…' : 'Suggest'}
         </button>
+      </div>
+      <div style={{ marginBottom: '1.5rem', fontSize: 13, color: '#555' }}>
+        {doc ? (
+          <>
+            📄 {doc.name} ({Math.round(doc.text.length / 1000)}k chars){' '}
+            <button onClick={() => setDoc(null)} style={{ border: 'none', background: 'none', color: '#4054b2', cursor: 'pointer' }}>
+              ✕ clear
+            </button>
+          </>
+        ) : (
+          <label style={{ cursor: 'pointer', color: '#4054b2' }}>
+            📎 …or upload a document (PDF, DOCX, TXT, MD)
+            <input
+              type="file"
+              accept=".pdf,.docx,.txt,.md"
+              style={{ display: 'none' }}
+              onChange={(e) => e.target.files?.[0] && uploadDoc(e.target.files[0])}
+            />
+          </label>
+        )}
       </div>
 
       {error && <p style={{ color: '#b3261e' }}>Error: {error}</p>}

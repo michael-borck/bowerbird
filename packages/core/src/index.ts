@@ -15,6 +15,8 @@ export { diversify } from './rank/diversity.js';
 export { classifySource } from './enrich/sourceType.js';
 export { parsePageMeta, fetchPageMeta, type PageMeta } from './enrich/page.js';
 export { mapUrlStatus } from './verify/verify.js';
+export { deriveQuery, heuristicKeywords, extractPhrases } from './retrieval/query.js';
+export { reconstructAbstract } from './retrieval/openalexTopical.js';
 export type { Candidate } from './retrieval/candidates.js';
 
 // Document input (PDF, DOCX, TXT, MD) comes straight from cite-sight-core.

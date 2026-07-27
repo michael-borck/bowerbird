@@ -6,6 +6,9 @@ import {
   parsePageMeta,
   mapUrlStatus,
   toMarkdown,
+  heuristicKeywords,
+  extractPhrases,
+  reconstructAbstract,
 } from '../dist/index.js';
 
 const resource = (over = {}) => ({
@@ -91,6 +94,50 @@ test('mapUrlStatus never upgrades inconclusive checks', () => {
   assert.equal(mapUrlStatus('dead'), 'dead');
   assert.equal(mapUrlStatus('timeout'), 'unverified');
   assert.equal(mapUrlStatus('error'), 'unverified');
+});
+
+test('heuristicKeywords surfaces frequent content words, not stopwords', () => {
+  const text =
+    'Spaced repetition is a learning technique. Spaced repetition schedules ' +
+    'reviews of material over increasing intervals, and retrieval practice ' +
+    'strengthens memory. The technique of spaced repetition is widely studied.';
+  const q = heuristicKeywords(text);
+  assert.match(q, /spaced/);
+  assert.match(q, /repetition/);
+  assert.doesNotMatch(q, /\bthe\b|\bis\b|\band\b/);
+});
+
+test('extractPhrases splits on stopwords and keeps multi-word phrases', () => {
+  assert.deepEqual(extractPhrases('spaced repetition and retrieval practice in learning'), [
+    'spaced repetition',
+    'retrieval practice',
+  ]);
+  assert.deepEqual(extractPhrases('photosynthesis'), []);
+});
+
+test('extractPhrases breaks long stopword-free runs into bigrams', () => {
+  assert.deepEqual(extractPhrases('spaced repetition retrieval practice memory consolidation'), [
+    'spaced repetition',
+    'retrieval practice',
+    'memory consolidation',
+  ]);
+});
+
+test('reconstructAbstract rebuilds text from an inverted index', () => {
+  const text = reconstructAbstract({
+    Testing: [0],
+    effects: [1],
+    improve: [2],
+    retention: [3, 5],
+    of: [4],
+  });
+  assert.equal(text, 'Testing effects improve retention of retention');
+});
+
+test('reconstructAbstract truncates at the cap', () => {
+  const long = reconstructAbstract({ word: [0, 1, 2, 3, 4] }, 12);
+  assert.equal(long.length <= 12, true);
+  assert.match(long, /…$/);
 });
 
 test('toMarkdown distinguishes generated rationale from extracted description', () => {

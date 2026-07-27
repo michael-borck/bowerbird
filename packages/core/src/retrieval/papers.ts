@@ -1,43 +1,47 @@
-import { searchOpenAlex, searchCrossref } from '@michaelborck/cite-sight-core';
+import { searchCrossref } from '@michaelborck/cite-sight-core';
+import { searchOpenAlexTopical } from './openalexTopical.js';
 import type { Candidate } from './candidates.js';
 
 /**
- * Papers come from the academic databases cite-sight-core already speaks to
- * (ADR-0002). Results are database-attested: existence is verified by
- * construction, no separate URL probe needed.
+ * Papers via OpenAlex topical search (relevance-ranked, with abstracts);
+ * Crossref through cite-sight-core (ADR-0002) as the fallback when
+ * OpenAlex is unreachable. Results are database-attested: existence is
+ * verified by construction, no separate URL probe needed.
  */
 export async function retrievePapers(topic: string, mailto?: string): Promise<Candidate[]> {
-  // OpenAlex first (richer, no key); Crossref as the second opinion.
-  const [openalex, crossref] = await Promise.allSettled([
-    searchOpenAlex(topic, mailto),
-    searchCrossref(topic, mailto),
-  ]);
-  const works = [
-    ...(openalex.status === 'fulfilled' ? openalex.value : []),
-    ...(crossref.status === 'fulfilled' ? crossref.value : []),
-  ];
-  if (openalex.status === 'rejected' && crossref.status === 'rejected') {
-    throw new Error('all paper databases unreachable');
+  try {
+    const candidates = await searchOpenAlexTopical(topic, mailto);
+    if (candidates.length > 0) return dedupe(candidates);
+  } catch {
+    // fall through to Crossref
   }
+  const works = await searchCrossref(topic, mailto);
+  return dedupe(
+    works.flatMap((work): Candidate[] => {
+      const url = work.doi ? `https://doi.org/${work.doi}` : work.url;
+      if (!url) return [];
+      return [
+        {
+          title: work.title,
+          url,
+          format: 'paper',
+          authors: work.authors,
+          year: work.year,
+          doi: work.doi,
+          origin: 'crossref',
+          databaseAttested: true,
+        },
+      ];
+    }),
+  );
+}
 
+function dedupe(candidates: Candidate[]): Candidate[] {
   const seen = new Set<string>();
-  const candidates: Candidate[] = [];
-  for (const work of works) {
-    const key = (work.doi ?? work.title).toLowerCase();
-    if (seen.has(key)) continue;
+  return candidates.filter((c) => {
+    const key = (c.doi ?? c.title).toLowerCase();
+    if (seen.has(key)) return false;
     seen.add(key);
-    const url = work.doi ? `https://doi.org/${work.doi}` : work.url;
-    if (!url) continue;
-    candidates.push({
-      title: work.title,
-      url,
-      format: 'paper',
-      authors: work.authors,
-      year: work.year,
-      doi: work.doi,
-      origin: work.source === 'crossref' ? 'crossref' : 'openalex',
-      databaseAttested: true,
-    });
-  }
-  return candidates;
+    return true;
+  });
 }
