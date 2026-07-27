@@ -198,7 +198,21 @@ export function App() {
             </article>
           ))}
 
-          <p style={{ fontSize: 12, color: '#888', marginTop: 16 }}>
+          {result.componentHealth.videos === 'unavailable' && (
+            <p style={{ fontSize: 13, color: '#555', marginTop: 16, padding: '10px 14px', background: '#f4f6ff', borderRadius: 8 }}>
+              🎬 Want video results too? With your own YouTube API key you get
+              video search as well —{' '}
+              <a href="https://github.com/michael-borck/bowerbird#self-hosting" style={{ color: '#4054b2' }}>
+                self-host
+              </a>{' '}
+              or grab the{' '}
+              <a href="https://github.com/michael-borck/bowerbird/releases/latest" style={{ color: '#4054b2' }}>
+                desktop app
+              </a>
+              .
+            </p>
+          )}
+          <p style={{ fontSize: 12, color: '#888', marginTop: 12 }}>
             Components:{' '}
             {Object.entries(result.componentHealth)
               .map(([k, v]) => `${k} ${v === 'ok' ? '✓' : `(${v})`}`)

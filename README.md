@@ -45,10 +45,15 @@ handing you an answer to paste.
 | | Free hosted | Self-host / Desktop |
 |---|---|---|
 | Input | One topic or document | Batch: a semester of topics at once |
+| Sources | Papers, podcasts, books, web | All of those **plus video search**, with your own YouTube key |
 | Thumbnails | oEmbed and og:image | Full screenshots |
 | Verification | Yes | Yes |
 | LLM | Quota'd, or bring your own key | Local Ollama, or your own key |
 | Export | Markdown | Markdown, LMS HTML, reading list, citations |
+
+Video search is a bring-your-own-key feature by design: a shared YouTube
+API key on a free public instance would exhaust its quota (and invite
+abuse) within hours, so the hosted tier ships without one.
 
 ## Self-hosting
 
