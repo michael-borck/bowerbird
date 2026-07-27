@@ -40,6 +40,21 @@ export type LicensingStatus =
   | 'link-only'
   | 'unknown';
 
+/**
+ * Which rung of the annotation ladder produced the text (ADR-0011):
+ * 'llm' is a relational rationale, 'extracted' is a descriptive fallback
+ * (og:description, abstract, RSS summary), 'none' means neither was
+ * available. UIs must render the distinction — an extracted description is
+ * never presented as a generated rationale.
+ */
+export type AnnotationSource = 'llm' | 'extracted' | 'none';
+
+export interface Annotation {
+  source: AnnotationSource;
+  /** Rationale or description; null when source is 'none'. */
+  text: string | null;
+}
+
 export interface Resource {
   title: string;
   url: string;
@@ -49,8 +64,8 @@ export interface Resource {
   /** Consultant reports are marketing artefacts as often as evidence. */
   commerciallyInterested: boolean;
   licensing: LicensingStatus;
-  /** Why this one, what it adds, what it does not cover. Null when the LLM was unavailable (ADR-0006). */
-  rationale: string | null;
+  /** Why this one, what it adds, what it does not cover — or an extractive description (ADR-0011). */
+  annotation: Annotation;
   /** oEmbed or og:image URL; null when unavailable (ADR-0005). */
   thumbnailUrl: string | null;
   accessibilityNotes: string[];

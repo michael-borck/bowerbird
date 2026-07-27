@@ -19,6 +19,7 @@ old one.
 | [0008](0008-hosting-vps-docker-plus-github-pages.md) | Hosting: VPS Docker for the app, GitHub Pages for the landing page | Accepted |
 | [0009](0009-list-mode-first-interview-mode-deferred.md) | List mode first; interview mode deferred to v2 | Accepted |
 | [0010](0010-electron-desktop-shell.md) | Electron for the desktop shell | Accepted |
+| [0011](0011-annotation-ladder.md) | Annotation ladder: LLM rationale degrades to extractive description | Accepted |
 
 ## Adding an ADR
 
