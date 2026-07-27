@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-27
+
+### Added
+
+- The desktop app is now functional: the Electron main process embeds the
+  same Express app the hosted server runs (`createApp` from the server
+  package) on a loopback-only random port — one JSON contract, two homes.
+- Settings panel in the web UI (shared by desktop): AI provider URL, key
+  and model, plus a YouTube API key for video search. Stored in browser
+  storage only, sent per request, never persisted server-side (ADR-0004).
+- Local Ollama detection (`/api/detect-ollama`) with model listing —
+  the talk-buddy first-run pattern.
+- Per-request YouTube key joins the BYO contract; any BYO credential
+  routes around the queue so it never lands in Redis.
+
+### Changed
+
+- Server refactored into an embeddable `createApp` plus a thin hosted
+  entry point (env config, BullMQ runner, listen).
+
 ## [0.3.0] - 2026-07-27
 
 ### Added

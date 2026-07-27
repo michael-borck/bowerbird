@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Annotation {
   source: 'llm' | 'extracted' | 'none';
@@ -26,6 +26,28 @@ interface SuggestResult {
   componentHealth: Record<string, string>;
 }
 
+/**
+ * BYO credentials live in browser storage only and are sent per request —
+ * never persisted server-side (ADR-0004).
+ */
+interface Settings {
+  providerUrl: string;
+  apiKey: string;
+  model: string;
+  youtubeApiKey: string;
+}
+
+const SETTINGS_KEY = 'bowerbird-settings';
+const EMPTY_SETTINGS: Settings = { providerUrl: '', apiKey: '', model: '', youtubeApiKey: '' };
+
+function loadSettings(): Settings {
+  try {
+    return { ...EMPTY_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') };
+  } catch {
+    return EMPTY_SETTINGS;
+  }
+}
+
 const VERIFY_COLOR: Record<string, string> = {
   verified: '#1a7f4e',
   blocked: '#a06a00',
@@ -40,6 +62,38 @@ export function App() {
   const [result, setResult] = useState<SuggestResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings>(loadSettings);
+  const [showSettings, setShowSettings] = useState(false);
+  const [llmConfigured, setLlmConfigured] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((h) => setLlmConfigured(h.components?.llm !== 'unavailable'))
+      .catch(() => {});
+  }, []);
+
+  function saveSettings(next: Settings) {
+    setSettings(next);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  }
+
+  function requestBody(extra: Record<string, unknown> = {}) {
+    return JSON.stringify({
+      input: doc ? doc.text : topic.trim(),
+      ...(settings.providerUrl
+        ? {
+            provider: {
+              url: settings.providerUrl,
+              apiKey: settings.apiKey || undefined,
+              model: settings.model || undefined,
+            },
+          }
+        : {}),
+      ...(settings.youtubeApiKey ? { youtubeApiKey: settings.youtubeApiKey } : {}),
+      ...extra,
+    });
+  }
 
   async function uploadDoc(file: File) {
     setError(null);
@@ -64,7 +118,7 @@ export function App() {
       const res = await fetch('/api/suggest', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ input }),
+        body: requestBody(),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
       setResult(await res.json());
@@ -80,7 +134,7 @@ export function App() {
     const res = await fetch('/api/suggest', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input: doc ? doc.text : topic.trim(), format }),
+      body: requestBody({ format }),
     });
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -90,12 +144,26 @@ export function App() {
     URL.revokeObjectURL(a.href);
   }
 
+  const llmAvailable = llmConfigured || Boolean(settings.providerUrl);
+
   return (
     <main style={{ fontFamily: 'system-ui', maxWidth: 760, margin: '3rem auto', padding: '0 1rem', lineHeight: 1.5 }}>
-      <h1 style={{ marginBottom: 4 }}>🪶 Bowerbird</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <h1 style={{ marginBottom: 4 }}>🪶 Bowerbird</h1>
+        <button
+          onClick={() => setShowSettings((s) => !s)}
+          style={{ border: '1px solid #bbb', background: showSettings ? '#eef1ff' : '#fff', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 14 }}
+        >
+          ⚙ Settings
+        </button>
+      </div>
       <p style={{ color: '#555', marginTop: 0 }}>
         Verified supporting resources for your teaching — every link checked, nothing generated.
       </p>
+
+      {showSettings && (
+        <SettingsPanel settings={settings} onSave={saveSettings} onClose={() => setShowSettings(false)} />
+      )}
 
       <div style={{ display: 'flex', gap: 8, margin: '1.5rem 0 0.5rem' }}>
         <input
@@ -134,6 +202,16 @@ export function App() {
           </label>
         )}
       </div>
+
+      {!llmAvailable && (
+        <p style={{ fontSize: 13, color: '#555' }}>
+          💡 No AI provider configured — results will carry extracted descriptions instead of
+          teaching rationales.{' '}
+          <button onClick={() => setShowSettings(true)} style={{ border: 'none', background: 'none', color: '#4054b2', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+            Configure one in Settings.
+          </button>
+        </p>
+      )}
 
       {error && <p style={{ color: '#b3261e' }}>Error: {error}</p>}
       {loading && <p style={{ color: '#555' }}>Retrieving, verifying and annotating — this takes a moment…</p>}
@@ -198,14 +276,17 @@ export function App() {
             </article>
           ))}
 
-          {result.componentHealth.videos === 'unavailable' && (
+          {result.componentHealth.videos === 'unavailable' && !settings.youtubeApiKey && (
             <p style={{ fontSize: 13, color: '#555', marginTop: 16, padding: '10px 14px', background: '#f4f6ff', borderRadius: 8 }}>
-              🎬 Want video results too? With your own YouTube API key you get
-              video search as well —{' '}
+              🎬 Want video results too? Add your own YouTube API key in{' '}
+              <button onClick={() => setShowSettings(true)} style={{ border: 'none', background: 'none', color: '#4054b2', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                Settings
+              </button>
+              , or{' '}
               <a href="https://github.com/michael-borck/bowerbird#self-hosting" style={{ color: '#4054b2' }}>
                 self-host
               </a>{' '}
-              or grab the{' '}
+              / grab the{' '}
               <a href="https://github.com/michael-borck/bowerbird/releases/latest" style={{ color: '#4054b2' }}>
                 desktop app
               </a>
@@ -221,6 +302,99 @@ export function App() {
         </>
       )}
     </main>
+  );
+}
+
+function SettingsPanel({
+  settings,
+  onSave,
+  onClose,
+}: {
+  settings: Settings;
+  onSave: (s: Settings) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState(settings);
+  const [detecting, setDetecting] = useState(false);
+  const [detectNote, setDetectNote] = useState<string | null>(null);
+  const [models, setModels] = useState<string[]>([]);
+
+  async function detectOllama() {
+    setDetecting(true);
+    setDetectNote(null);
+    try {
+      const res = await fetch('/api/detect-ollama');
+      const data = await res.json();
+      if (data.available) {
+        setDraft((d) => ({ ...d, providerUrl: data.url, model: data.models[0] ?? d.model }));
+        setModels(data.models);
+        setDetectNote(`Found Ollama with ${data.models.length} model(s).`);
+      } else {
+        setDetectNote('No local Ollama found — install from ollama.com, or use the hosted service as-is.');
+      }
+    } catch {
+      setDetectNote('Detection failed.');
+    } finally {
+      setDetecting(false);
+    }
+  }
+
+  const field = { display: 'block', width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #bbb', fontSize: 14, marginTop: 4 } as const;
+  const label = { fontSize: 13, color: '#444', display: 'block', marginTop: 12 } as const;
+
+  return (
+    <section style={{ border: '1px solid #ccd', borderRadius: 10, padding: '14px 18px', margin: '1rem 0', background: '#fafbff' }}>
+      <strong style={{ fontSize: 15 }}>Settings</strong>
+      <p style={{ fontSize: 12, color: '#777', margin: '4px 0 0' }}>
+        Keys are stored in this browser only and sent per request — never saved on the server.
+      </p>
+
+      <label style={label}>
+        AI provider URL (Ollama or compatible)
+        <input style={field} value={draft.providerUrl} placeholder="http://localhost:11434"
+          onChange={(e) => setDraft({ ...draft, providerUrl: e.target.value })} />
+      </label>
+      <button onClick={detectOllama} disabled={detecting}
+        style={{ marginTop: 6, padding: '5px 10px', borderRadius: 6, border: '1px solid #bbb', background: '#fff', cursor: 'pointer', fontSize: 12 }}>
+        {detecting ? 'Detecting…' : '🔍 Detect local Ollama'}
+      </button>
+      {detectNote && <span style={{ fontSize: 12, color: '#555', marginLeft: 8 }}>{detectNote}</span>}
+
+      <label style={label}>
+        API key (if the provider needs one)
+        <input style={field} type="password" value={draft.apiKey}
+          onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })} />
+      </label>
+
+      <label style={label}>
+        Model
+        {models.length > 0 ? (
+          <select style={field} value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })}>
+            {models.map((m) => <option key={m}>{m}</option>)}
+          </select>
+        ) : (
+          <input style={field} value={draft.model} placeholder="llama3.1:8b"
+            onChange={(e) => setDraft({ ...draft, model: e.target.value })} />
+        )}
+      </label>
+
+      <label style={label}>
+        YouTube API key (enables video search)
+        <input style={field} type="password" value={draft.youtubeApiKey}
+          onChange={(e) => setDraft({ ...draft, youtubeApiKey: e.target.value })} />
+      </label>
+
+      <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
+        <button onClick={() => { onSave(draft); onClose(); }}
+          style={{ padding: '7px 16px', borderRadius: 6, border: 'none', background: '#4054b2', color: '#fff', cursor: 'pointer' }}>
+          Save
+        </button>
+        <button onClick={onClose}
+          style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid #bbb', background: '#fff', cursor: 'pointer' }}>
+          Cancel
+        </button>
+      </div>
+    </section>
   );
 }
 

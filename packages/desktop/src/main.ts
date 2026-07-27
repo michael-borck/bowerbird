@@ -1,10 +1,38 @@
 import path from 'node:path';
+import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow } from 'electron';
+import { suggestResources, configFromEnv } from '@michaelborck/bowerbird-core';
+import { createApp } from '@michaelborck/bowerbird-server';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function createWindow(): void {
+/**
+ * The desktop app is the same web UI served by the same HTTP contract,
+ * embedded (ADR-0010). Requests run inline — no queue on a personal
+ * machine — and user credentials come per request from the UI's settings
+ * panel (browser storage, ADR-0004). Loopback only: nothing on the LAN
+ * can reach this server.
+ */
+function startEmbeddedServer(): Promise<number> {
+  const server = createApp({
+    pipelineDefaults: configFromEnv(),
+    run: (job, config) => suggestResources(job, config),
+    queueAvailable: false,
+    webDistPath: path.join(dirname, 'web'),
+    version: app.getVersion(),
+  });
+  return new Promise((resolve, reject) => {
+    const listener = server.listen(0, '127.0.0.1', () => {
+      const { port } = listener.address() as AddressInfo;
+      console.log(`bowerbird desktop server on 127.0.0.1:${port}`);
+      resolve(port);
+    });
+    listener.on('error', reject);
+  });
+}
+
+function createWindow(port: number): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -13,14 +41,15 @@ function createWindow(): void {
       sandbox: true,
     },
   });
-  void win.loadFile(path.join(dirname, 'web/index.html'));
+  void win.loadURL(`http://127.0.0.1:${port}`);
 }
 
 app.whenReady().then(async () => {
-  createWindow();
+  const port = await startEmbeddedServer();
+  createWindow(port);
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createWindow(port);
   });
 
   // Auto-update against GitHub Releases; non-fatal if offline (ADR-0006).

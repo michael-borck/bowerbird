@@ -1,6 +1,6 @@
 {
   "name": "@michaelborck/bowerbird-desktop",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "Bowerbird Desktop — Electron shell wrapping the web UI (ADR-0010).",
   "license": "MIT",
@@ -18,6 +18,8 @@
     "package": "electron-builder"
   },
   "dependencies": {
+    "@michaelborck/bowerbird-core": "*",
+    "@michaelborck/bowerbird-server": "*",
     "electron-updater": "^6.3.0"
   },
   "devDependencies": {
