@@ -1,6 +1,6 @@
 {
   "name": "@michaelborck/bowerbird-cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Bowerbird CLI: verified teaching resources from your terminal.",
   "license": "MIT",
   "author": "Michael Borck",
