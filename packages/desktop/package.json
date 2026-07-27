@@ -1,6 +1,6 @@
 {
   "name": "@michaelborck/bowerbird-desktop",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Bowerbird Desktop — Electron shell wrapping the web UI (ADR-0010).",
   "license": "MIT",

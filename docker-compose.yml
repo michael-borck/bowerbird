@@ -32,6 +32,21 @@ services:
       - redis-data:/data
     restart: unless-stopped
 
+  # Optional general-web retrieval via SearXNG. Start with:
+  #   docker compose --profile websearch up -d
+  # and set SEARXNG_URL=http://searxng:8080 (plus SEARXNG_SECRET) in .env.
+  # Needs deploy/searxng/settings.yml mounted below — curl it from the repo
+  # if deploying without a checkout (it enables the JSON API Bowerbird uses).
+  searxng:
+    image: searxng/searxng:latest
+    profiles: ["websearch"]
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-}
+      - SEARXNG_BASE_URL=http://searxng:8080/
+    volumes:
+      - ./deploy/searxng:/etc/searxng:ro
+    restart: unless-stopped
+
   # Uncomment to run Ollama in the same stack (needs ~8 GB RAM for an 8B model):
   # ollama:
   #   image: ollama/ollama:latest

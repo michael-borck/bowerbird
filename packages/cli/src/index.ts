@@ -5,6 +5,8 @@ import {
   suggestResources,
   configFromEnv,
   toMarkdown,
+  toCitations,
+  toLmsHtml,
   extract,
 } from '@michaelborck/bowerbird-core';
 
@@ -21,11 +23,16 @@ program
   .argument('[topic...]', 'topic to find supporting resources for')
   .option('-f, --file <path>', 'read the topic from a document (PDF, DOCX, TXT, MD)')
   .option('-n, --max-results <n>', 'maximum number of resources', '10')
-  .option('--json', 'output JSON instead of markdown')
+  .option(
+    '-o, --format <format>',
+    'output format: markdown, json, html (LMS-ready), apa, harvard',
+    'markdown',
+  )
+  .option('--json', 'shorthand for --format json')
   .action(
     async (
       topicWords: string[],
-      options: { file?: string; maxResults: string; json?: boolean },
+      options: { file?: string; maxResults: string; format: string; json?: boolean },
     ) => {
       let input = topicWords.join(' ');
       let label = input;
@@ -41,9 +48,22 @@ program
         { input, maxResults: Number(options.maxResults) },
         configFromEnv(),
       );
-      const out = options.json
-        ? JSON.stringify(result, null, 2)
-        : toMarkdown(label, result);
+      const format = options.json ? 'json' : options.format;
+      let out: string;
+      switch (format) {
+        case 'json':
+          out = JSON.stringify(result, null, 2);
+          break;
+        case 'html':
+          out = toLmsHtml(label, result);
+          break;
+        case 'apa':
+        case 'harvard':
+          out = toCitations(result, format);
+          break;
+        default:
+          out = toMarkdown(label, result);
+      }
       process.stdout.write(out + '\n');
     },
   );

@@ -1,0 +1,9 @@
+# Minimal SearXNG settings for Bowerbird's web retrieval.
+# The JSON format must be enabled — Bowerbird queries /search?format=json,
+# which stock SearXNG refuses (403) out of the box.
+# Set the instance secret via the SEARXNG_SECRET environment variable.
+use_default_settings: true
+search:
+  formats:
+    - html
+    - json

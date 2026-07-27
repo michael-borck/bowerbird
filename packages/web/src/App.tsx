@@ -12,8 +12,11 @@ interface Resource {
   sourceType: string;
   authors: string[];
   year: number | null;
+  venue: string | null;
   verification: string;
   commerciallyInterested: boolean;
+  licensing: string;
+  accessibilityNotes: string[];
   annotation: Annotation;
   thumbnailUrl: string | null;
 }
@@ -73,16 +76,16 @@ export function App() {
     }
   }
 
-  async function downloadMarkdown() {
+  async function download(format: string, extension: string) {
     const res = await fetch('/api/suggest', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ input: doc ? doc.text : topic.trim(), format: 'markdown' }),
+      body: JSON.stringify({ input: doc ? doc.text : topic.trim(), format }),
     });
     const blob = await res.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'bowerbird-resources.md';
+    a.download = `bowerbird-resources.${extension}`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -139,9 +142,24 @@ export function App() {
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <h2 style={{ fontSize: 18 }}>{result.resources.length} verified resources</h2>
-            <button onClick={downloadMarkdown} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #bbb', background: '#fff', cursor: 'pointer' }}>
-              ⬇ Markdown
-            </button>
+            <span style={{ display: 'flex', gap: 6 }}>
+              {(
+                [
+                  ['markdown', 'md', 'Markdown'],
+                  ['html', 'html', 'LMS HTML'],
+                  ['apa', 'txt', 'APA'],
+                  ['harvard', 'txt', 'Harvard'],
+                ] as const
+              ).map(([format, ext, name]) => (
+                <button
+                  key={format}
+                  onClick={() => download(format, ext)}
+                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #bbb', background: '#fff', cursor: 'pointer', fontSize: 13 }}
+                >
+                  ⬇ {name}
+                </button>
+              ))}
+            </span>
           </div>
 
           {result.resources.map((r) => (
@@ -157,9 +175,16 @@ export function App() {
                   <Badge text={r.format} />
                   <Badge text={r.sourceType} />
                   <Badge text={r.verification} color={VERIFY_COLOR[r.verification]} />
+                  {r.licensing !== 'unknown' && (
+                    <Badge text={r.licensing.replace(/-/g, ' ')} color="#2e6f40" />
+                  )}
+                  {r.accessibilityNotes.map((note) => (
+                    <Badge key={note} text={`♿ ${note}`} color="#376a9e" />
+                  ))}
                   {r.commerciallyInterested && <Badge text="⚠ commercially interested" color="#a06a00" />}
                   {r.year && <span style={{ marginRight: 8 }}>{r.year}</span>}
                   {r.authors.length > 0 && <span>{r.authors.slice(0, 3).join(', ')}</span>}
+                  {r.venue && <span style={{ color: '#888' }}> · {r.venue}</span>}
                 </div>
                 {r.annotation.text && (
                   <p style={{ margin: '4px 0 0', fontSize: 14 }}>

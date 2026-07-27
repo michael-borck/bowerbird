@@ -1,4 +1,4 @@
-import type { ResourceFormat } from '../types.js';
+import type { LicensingStatus, ResourceFormat } from '../types.js';
 
 /** A retrieved-but-not-yet-enriched resource. */
 export interface Candidate {
@@ -8,6 +8,11 @@ export interface Candidate {
   authors: string[];
   year: number | null;
   doi?: string;
+  /** Journal, publisher or channel, when the source provides it. */
+  venue?: string;
+  /** Licensing signal from the retrieval source (spec §3: institutional plumbing). */
+  licensing?: LicensingStatus;
+  accessibilityNotes?: string[];
   /** Description text supplied by the retrieval source, if any (ADR-0011 rung 2). */
   description?: string;
   thumbnailUrl?: string;

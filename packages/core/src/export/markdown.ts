@@ -30,8 +30,11 @@ function resourceBlock(r: Resource): string[] {
   const meta: string[] = [`**${label(r.format)}**`];
   if (r.year) meta.push(String(r.year));
   if (r.authors.length) meta.push(r.authors.slice(0, 3).join(', '));
+  if (r.venue) meta.push(r.venue);
   meta.push(`source: ${r.sourceType}`);
   meta.push(`verification: ${r.verification}`);
+  if (r.licensing !== 'unknown') meta.push(`licensing: ${r.licensing}`);
+  if (r.accessibilityNotes.length) meta.push(r.accessibilityNotes.join(', '));
   if (r.commerciallyInterested) meta.push('⚠ commercially interested');
 
   const lines = [`## [${r.title}](${r.url})`, '', meta.join(' · ')];

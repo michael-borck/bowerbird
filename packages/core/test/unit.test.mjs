@@ -9,6 +9,10 @@ import {
   heuristicKeywords,
   extractPhrases,
   reconstructAbstract,
+  formatApa,
+  formatHarvard,
+  toLmsHtml,
+  mapOpenAlexLicensing,
 } from '../dist/index.js';
 
 const resource = (over = {}) => ({
@@ -18,6 +22,7 @@ const resource = (over = {}) => ({
   sourceType: 'peer-reviewed',
   authors: [],
   year: 2024,
+  venue: null,
   verification: 'verified',
   commerciallyInterested: false,
   licensing: 'unknown',
@@ -138,6 +143,58 @@ test('reconstructAbstract truncates at the cap', () => {
   const long = reconstructAbstract({ word: [0, 1, 2, 3, 4] }, 12);
   assert.equal(long.length <= 12, true);
   assert.match(long, /…$/);
+});
+
+test('formatApa builds a conventional reference from held metadata', () => {
+  const apa = formatApa(
+    resource({
+      title: 'The critical role of retrieval practice',
+      authors: ['Henry Roediger', 'Jeffrey Karpicke'],
+      year: 2006,
+      venue: 'Psychological Science',
+      url: 'https://doi.org/10.1111/x',
+    }),
+  );
+  assert.equal(
+    apa,
+    'Roediger, H., & Karpicke, J. (2006). The critical role of retrieval practice. *Psychological Science*. https://doi.org/10.1111/x',
+  );
+});
+
+test('formatHarvard truncates long author lists with et al.', () => {
+  const harvard = formatHarvard(
+    resource({ authors: ['A One', 'B Two', 'C Three', 'D Four'], year: 2020, title: 'X' }),
+  );
+  assert.match(harvard, /et al\./);
+  assert.match(harvard, /2020,/);
+});
+
+test('citations omit missing fields rather than inventing them', () => {
+  const apa = formatApa(resource({ authors: [], year: null, venue: null }));
+  assert.match(apa, /^\(n\.d\.\)\./);
+  assert.doesNotMatch(apa, /undefined|null/);
+});
+
+test('toLmsHtml escapes content and uses inline styles only', () => {
+  const html = toLmsHtml('a <b> topic', {
+    resources: [
+      resource({
+        title: 'Maths & <scripts>',
+        annotation: { source: 'llm', text: 'Covers x < y.' },
+      }),
+    ],
+    componentHealth: {},
+  });
+  assert.match(html, /a &lt;b&gt; topic/);
+  assert.match(html, /Maths &amp; &lt;scripts&gt;/);
+  assert.match(html, /Rationale \(generated\):/);
+  assert.doesNotMatch(html, /<style|<script/);
+});
+
+test('mapOpenAlexLicensing maps CC, OA and closed correctly', () => {
+  assert.equal(mapOpenAlexLicensing({ license: 'cc-by', isOa: true }), 'creative-commons');
+  assert.equal(mapOpenAlexLicensing({ isOa: true }), 'link-only');
+  assert.equal(mapOpenAlexLicensing({ isOa: false }), 'library-subscription');
 });
 
 test('toMarkdown distinguishes generated rationale from extracted description', () => {

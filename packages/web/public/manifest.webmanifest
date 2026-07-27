@@ -1,0 +1,17 @@
+{
+  "name": "Bowerbird",
+  "short_name": "Bowerbird",
+  "description": "Verified supporting resources for your teaching.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4054b2",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

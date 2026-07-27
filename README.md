@@ -81,7 +81,18 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 Configuration lives in a `.env` file next to `docker-compose.yml` — copy
 [`.env.example`](.env.example) and fill it in (`OLLAMA_URL`, and
 `OLLAMA_API_KEY` if your Ollama sits behind an authenticating proxy).
-Alternatively, bring your own API key under **Settings → AI provider**. BYO keys are held in browser
+Alternatively, bring your own API key under **Settings → AI provider**.
+
+Two optional retrieval sources are off until configured: set
+`YOUTUBE_API_KEY` for video results, and enable general-web results with
+the bundled SearXNG metasearch service:
+
+```bash
+curl -fsSL --create-dirs -o deploy/searxng/settings.yml \
+  https://raw.githubusercontent.com/michael-borck/bowerbird/main/deploy/searxng/settings.yml
+# in .env: SEARXNG_URL=http://searxng:8080 and SEARXNG_SECRET=$(openssl rand -hex 32)
+docker compose --profile websearch up -d
+``` BYO keys are held in browser
 storage and passed per request only — they are **never persisted server-side**
 ([ADR-0004](docs/adr/0004-byok-keys-never-persisted-server-side.md)).
 

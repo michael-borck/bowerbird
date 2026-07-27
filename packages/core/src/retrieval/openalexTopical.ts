@@ -8,8 +8,25 @@ interface OpenAlexWork {
   cited_by_count?: number;
   authorships?: Array<{ author?: { display_name?: string } }>;
   abstract_inverted_index?: Record<string, number[]>;
-  open_access?: { oa_url?: string };
-  primary_location?: { landing_page_url?: string };
+  open_access?: { oa_url?: string; is_oa?: boolean };
+  primary_location?: {
+    landing_page_url?: string;
+    license?: string;
+    source?: { display_name?: string };
+  };
+}
+
+/**
+ * Licensing from OpenAlex signals (spec §3 institutional plumbing):
+ * a CC license is redistributable; open access without one is link-only;
+ * closed access is typically reachable via the library subscription.
+ */
+export function mapOpenAlexLicensing(work: {
+  license?: string;
+  isOa?: boolean;
+}): 'creative-commons' | 'link-only' | 'library-subscription' {
+  if (work.license?.startsWith('cc')) return 'creative-commons';
+  return work.isOa ? 'link-only' : 'library-subscription';
 }
 
 /**
@@ -59,6 +76,11 @@ export async function searchOpenAlexTopical(
         description: w.abstract_inverted_index
           ? reconstructAbstract(w.abstract_inverted_index)
           : undefined,
+        venue: w.primary_location?.source?.display_name,
+        licensing: mapOpenAlexLicensing({
+          license: w.primary_location?.license,
+          isOa: w.open_access?.is_oa,
+        }),
         origin: 'openalex',
         databaseAttested: true,
       };

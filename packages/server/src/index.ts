@@ -8,6 +8,8 @@ import multer from 'multer';
 import {
   configFromEnv,
   toMarkdown,
+  toCitations,
+  toLmsHtml,
   extract,
   type PipelineConfig,
 } from '@michaelborck/bowerbird-core';
@@ -42,7 +44,7 @@ app.get('/api/health', (_req, res) => {
 interface SuggestBody {
   input?: string;
   maxResults?: number;
-  format?: 'json' | 'markdown';
+  format?: 'json' | 'markdown' | 'html' | 'apa' | 'harvard';
   /**
    * Per-request BYO provider (ADR-0004): held in memory for the life of
    * this call only — never logged, never queued, never persisted.
@@ -72,10 +74,20 @@ app.post('/api/suggest', async (req, res) => {
       pipelineConfig,
       byok,
     );
-    if (body.format === 'markdown') {
-      res.type('text/markdown').send(toMarkdown(input.slice(0, 120), result));
-    } else {
-      res.json(result);
+    const topicLabel = input.slice(0, 120);
+    switch (body.format) {
+      case 'markdown':
+        res.type('text/markdown').send(toMarkdown(topicLabel, result));
+        break;
+      case 'html':
+        res.type('text/html').send(toLmsHtml(topicLabel, result));
+        break;
+      case 'apa':
+      case 'harvard':
+        res.type('text/plain').send(toCitations(result, body.format));
+        break;
+      default:
+        res.json(result);
     }
   } catch (error) {
     res.status(500).json({

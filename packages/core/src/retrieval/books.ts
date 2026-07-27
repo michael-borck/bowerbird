@@ -8,6 +8,15 @@ interface OpenLibraryDoc {
   first_publish_year?: number;
   cover_i?: number;
   first_sentence?: string[];
+  publisher?: string[];
+  ebook_access?: 'public' | 'borrowable' | 'printdisabled' | 'no_ebook';
+}
+
+function bookLicensing(access?: OpenLibraryDoc['ebook_access']) {
+  if (access === 'public') return 'oer' as const;
+  if (access === 'borrowable' || access === 'printdisabled')
+    return 'library-subscription' as const;
+  return 'link-only' as const;
 }
 
 /** Book retrieval via the free, keyless Open Library search API. */
@@ -33,6 +42,8 @@ export async function retrieveBooks(topic: string): Promise<Candidate[]> {
         thumbnailUrl: d.cover_i
           ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`
           : undefined,
+        venue: d.publisher?.[0],
+        licensing: bookLicensing(d.ebook_access),
         origin: 'openlibrary',
         databaseAttested: true,
       };

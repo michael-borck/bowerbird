@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-27
+
+### Added
+
+- Licensing status on results (spec §3 institutional plumbing): CC /
+  open-access / library-subscription for papers via OpenAlex, ebook access
+  for books via Open Library, Creative Commons flag for YouTube videos.
+- Accessibility notes: captions flag on videos from the YouTube API.
+- Venue (journal / publisher / channel) on results.
+- Citation export: APA 7 and Harvard, from held metadata only — missing
+  fields are omitted, never invented.
+- LMS-ready HTML export: single self-contained fragment, inline styles
+  only (LMS editors strip style blocks), with annotation provenance.
+- SearXNG service in the compose stack behind a `websearch` profile, with
+  the settings file that enables its JSON API (`deploy/searxng/`).
+- PWA: web manifest, feather icon, and a network-first service worker
+  that never caches API responses.
+
+### Fixed
+
+- Duplicate results from one retrieval source (URL-level dedupe across
+  all sources).
+- Internal workspace dependencies use `*` so npm never substitutes a
+  published registry copy for the local workspace.
+
 ## [0.2.1] - 2026-07-27
 
 ### Added

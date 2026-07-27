@@ -55,6 +55,8 @@ export interface Resource {
   sourceType: SourceType;
   authors: string[];
   year: number | null;
+  /** Journal, publisher or channel, when known. */
+  venue: string | null;
   verification: VerificationStatus;
   /** Consultant reports are marketing artefacts as often as evidence. */
   commerciallyInterested: boolean;

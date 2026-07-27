@@ -47,11 +47,17 @@ export async function suggestResources(
     sources.map(([, p]) => p ?? Promise.reject(new Error('not configured'))),
   );
   const candidates: Candidate[] = [];
+  const seenUrls = new Set<string>();
   settled.forEach((outcome, i) => {
     const name = sources[i][0];
     if (outcome.status === 'fulfilled') {
       health[name] = 'ok';
-      candidates.push(...outcome.value);
+      for (const candidate of outcome.value) {
+        const key = candidate.url.replace(/\/$/, '').toLowerCase();
+        if (seenUrls.has(key)) continue;
+        seenUrls.add(key);
+        candidates.push(candidate);
+      }
     } else {
       health[name] = 'unavailable';
     }
@@ -122,12 +128,13 @@ function toResource(candidate: Candidate, verification: Resource['verification']
     sourceType,
     authors: candidate.authors,
     year: candidate.year,
+    venue: candidate.venue ?? null,
     verification,
     commerciallyInterested,
-    licensing: 'unknown',
+    licensing: candidate.licensing ?? 'unknown',
     annotation: { source: 'none', text: null },
     thumbnailUrl: candidate.thumbnailUrl ?? null,
-    accessibilityNotes: [],
+    accessibilityNotes: candidate.accessibilityNotes ?? [],
   };
 }
 
