@@ -13,9 +13,13 @@ import {
   formatHarvard,
   toLmsHtml,
   mapOpenAlexLicensing,
+  heuristicCounterQueries,
+  toRecheckMarkdown,
+  toBatchMarkdown,
 } from '../dist/index.js';
 
 const resource = (over = {}) => ({
+  stance: 'supporting',
   title: 'T',
   url: 'https://example.org',
   format: 'paper',
@@ -195,6 +199,44 @@ test('mapOpenAlexLicensing maps CC, OA and closed correctly', () => {
   assert.equal(mapOpenAlexLicensing({ license: 'cc-by', isOa: true }), 'creative-commons');
   assert.equal(mapOpenAlexLicensing({ isOa: true }), 'link-only');
   assert.equal(mapOpenAlexLicensing({ isOa: false }), 'library-subscription');
+});
+
+test('heuristicCounterQueries inverts topic phrases with critical terms', () => {
+  const queries = heuristicCounterQueries('growth mindset in the classroom');
+  assert.ok(queries.length >= 2);
+  assert.ok(queries.some((q) => q.includes('growth mindset') && q.includes('criticism')));
+});
+
+test('toMarkdown puts counterpoints in their own labelled section', () => {
+  const md = toMarkdown('topic', {
+    resources: [
+      resource({ title: 'For' }),
+      resource({ title: 'Against', stance: 'counterpoint', url: 'https://example.org/against' }),
+    ],
+    componentHealth: {},
+  });
+  assert.match(md, /## Counterpoints/);
+  assert.ok(md.indexOf('For') < md.indexOf('## Counterpoints'));
+  assert.ok(md.indexOf('Against') > md.indexOf('## Counterpoints'));
+});
+
+test('toRecheckMarkdown lists changes first with old and new status', () => {
+  const md = toRecheckMarkdown([
+    { resource: resource({ title: 'Fine' }), previous: 'verified', current: 'verified', changed: false },
+    { resource: resource({ title: 'Rotted', url: 'https://gone.example' }), previous: 'verified', current: 'dead', changed: true },
+  ]);
+  assert.match(md, /2 resources, 1 changed/);
+  assert.ok(md.indexOf('Rotted') < md.indexOf('Fine'));
+  assert.match(md, /verified → \*\*dead\*\*/);
+});
+
+test('toBatchMarkdown renders one section per topic', () => {
+  const md = toBatchMarkdown([
+    { topic: 'alpha', result: { resources: [resource()], componentHealth: {} } },
+    { topic: 'beta', result: { resources: [], componentHealth: {} } },
+  ]);
+  assert.match(md, /# Supporting resources: alpha/);
+  assert.match(md, /# Supporting resources: beta/);
 });
 
 test('toMarkdown distinguishes generated rationale from extracted description', () => {

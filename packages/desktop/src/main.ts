@@ -14,6 +14,37 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
  * panel (browser storage, ADR-0004). Loopback only: nothing on the LAN
  * can reach this server.
  */
+/**
+ * ADR-0005 layer 3: full-page screenshots via Electron's own Chromium —
+ * the reason the desktop tier needs no separate browser download
+ * (ADR-0010). Hidden window, hard timeout, and failure returns undefined:
+ * screenshots are triage bonus, never a blocker.
+ */
+async function captureScreenshot(url: string): Promise<string | undefined> {
+  const win = new BrowserWindow({
+    show: false,
+    width: 1024,
+    height: 768,
+    webPreferences: { sandbox: true, contextIsolation: true },
+  });
+  try {
+    await Promise.race([
+      win.loadURL(url),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('screenshot timeout')), 15_000),
+      ),
+    ]);
+    // Give late-painting pages a beat before capturing.
+    await new Promise((r) => setTimeout(r, 800));
+    const image = await win.webContents.capturePage();
+    return image.resize({ width: 480 }).toDataURL();
+  } catch {
+    return undefined;
+  } finally {
+    win.destroy();
+  }
+}
+
 function startEmbeddedServer(): Promise<number> {
   const server = createApp({
     pipelineDefaults: configFromEnv(),
@@ -21,6 +52,8 @@ function startEmbeddedServer(): Promise<number> {
     queueAvailable: false,
     webDistPath: path.join(dirname, 'web'),
     version: app.getVersion(),
+    allowBatch: true,
+    screenshot: captureScreenshot,
   });
   return new Promise((resolve, reject) => {
     const listener = server.listen(0, '127.0.0.1', () => {

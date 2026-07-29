@@ -9,8 +9,21 @@ export function toMarkdown(topic: string, result: SuggestResult): string {
     `> verified — none are LLM-generated citations.`,
     '',
   ];
-  for (const r of result.resources) {
+  const supporting = result.resources.filter((r) => r.stance !== 'counterpoint');
+  const counterpoints = result.resources.filter((r) => r.stance === 'counterpoint');
+  for (const r of supporting) {
     lines.push(...resourceBlock(r), '');
+  }
+  if (counterpoints.length) {
+    lines.push(
+      '## Counterpoints',
+      '',
+      '_Deliberately surfaced material that disagrees with or complicates the framing above._',
+      '',
+    );
+    for (const r of counterpoints) {
+      lines.push(...resourceBlock(r), '');
+    }
   }
   const degraded = Object.entries(result.componentHealth).filter(([, v]) => v !== 'ok');
   if (degraded.length) {

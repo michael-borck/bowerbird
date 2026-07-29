@@ -15,10 +15,14 @@ export async function annotate(
   candidate: Candidate,
   config: PipelineConfig,
   llmWanted: boolean,
+  stance: 'supporting' | 'counterpoint' = 'supporting',
 ): Promise<Annotation> {
   if (llmWanted && config.ollamaUrl) {
     try {
-      return { source: 'llm', text: await generateRationale(topic, candidate, config) };
+      return {
+        source: 'llm',
+        text: await generateRationale(topic, candidate, config, stance),
+      };
     } catch {
       // fall through to rung 2
     }

@@ -21,10 +21,14 @@ import {
 interface SuggestJob {
   input: string;
   maxResults: number;
+  counterpoint?: boolean;
 }
 
 const QUEUE_NAME = 'bowerbird-suggest';
-const JOB_TIMEOUT_MS = 180_000;
+// Generous: counterpoint mode doubles the LLM work, and self-hosted
+// inference on modest hardware is slow. The queue's concurrency cap is
+// what protects the box, not this timeout (spec §9).
+const JOB_TIMEOUT_MS = 360_000;
 
 export interface SuggestRunner {
   available: boolean;
@@ -37,7 +41,10 @@ export async function createRunner(
   concurrency: number,
 ): Promise<SuggestRunner> {
   const inline = (job: SuggestJob, config: PipelineConfig) =>
-    suggestResources({ input: job.input, maxResults: job.maxResults }, config);
+    suggestResources(
+      { input: job.input, maxResults: job.maxResults, counterpoint: job.counterpoint },
+      config,
+    );
 
   let queue: Queue<SuggestJob> | null = null;
   let events: QueueEvents | null = null;

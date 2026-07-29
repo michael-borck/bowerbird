@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-29
+
+### Added
+
+- Counterpoint mode (ADR-0012): a second retrieval pass through inverted
+  queries surfaces verified material that disagrees with or complicates
+  the framing, stance-labelled and rendered in its own section across
+  web UI, markdown, and CLI (`--counterpoint`).
+- Batch input (spec §9 tier feature): `/api/batch` and `bowerbird batch
+  topics.txt` — many topics per run, one markdown document out. On by
+  default for self-host/desktop; the hosted instance disables it with
+  BOWERBIRD_ALLOW_BATCH=0.
+- Link-rot re-run mode: `bowerbird recheck saved.json` re-verifies a
+  previously saved list (DOIs against the databases, URLs re-probed) and
+  reports status changes first.
+- Full-page screenshot thumbnails on desktop (ADR-0005 layer 3) via
+  Electron's own Chromium, as fallback when oEmbed/og:image yield nothing.
+
+### Changed
+
+- Queue job timeout raised to 6 minutes — counterpoint doubles LLM work
+  and self-hosted inference on modest hardware is slow.
+
 ## [0.4.0] - 2026-07-27
 
 ### Added

@@ -20,6 +20,7 @@ old one.
 | [0009](0009-list-mode-first-interview-mode-deferred.md) | List mode first; interview mode deferred to v2 | Accepted |
 | [0010](0010-electron-desktop-shell.md) | Electron for the desktop shell | Accepted |
 | [0011](0011-annotation-ladder.md) | Annotation ladder: LLM rationale degrades to extractive description | Accepted |
+| [0012](0012-counterpoint-via-query-inversion.md) | Counterpoint mode via query inversion | Accepted |
 
 ## Adding an ADR
 

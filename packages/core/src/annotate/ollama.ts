@@ -14,6 +14,7 @@ export async function generateRationale(
   topic: string,
   candidate: Candidate,
   config: PipelineConfig,
+  stance: 'supporting' | 'counterpoint' = 'supporting',
 ): Promise<string> {
   if (!config.ollamaUrl) throw new Error('no Ollama configured');
   const meta = [
@@ -26,11 +27,17 @@ export async function generateRationale(
     .filter(Boolean)
     .join('\n');
 
+  const ask =
+    stance === 'counterpoint'
+      ? `In one or two sentences, say how this resource challenges, ` +
+        `complicates or disagrees with the usual framing of that topic, ` +
+        `and why showing students a counterpoint here could be valuable.`
+      : `In one or two sentences, say why this resource could support that teaching, ` +
+        `what it adds, and (if apparent) what it does not cover.`;
   const prompt =
     `A lecturer is teaching: "${topic.slice(0, 300)}"\n\n` +
-    `Candidate supporting resource:\n${meta}\n\n` +
-    `In one or two sentences, say why this resource could support that teaching, ` +
-    `what it adds, and (if apparent) what it does not cover. ` +
+    `Candidate ${stance === 'counterpoint' ? 'counterpoint' : 'supporting'} resource:\n${meta}\n\n` +
+    `${ask} ` +
     `Be concrete and honest; do not invent details not present above. ` +
     `Reply with the sentences only.`;
 

@@ -9,6 +9,9 @@
 
 export type * from './types.js';
 export { suggestResources } from './pipeline.js';
+export { suggestBatch, toBatchMarkdown, type BatchEntry } from './batch.js';
+export { recheckResources, toRecheckMarkdown, type RecheckEntry } from './recheck.js';
+export { deriveCounterQueries, heuristicCounterQueries } from './retrieval/counterpoint.js';
 export { configFromEnv, type PipelineConfig } from './config.js';
 export { toMarkdown } from './export/markdown.js';
 export { toCitations, formatApa, formatHarvard } from './export/citations.js';

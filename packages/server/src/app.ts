@@ -21,13 +21,17 @@ import {
 export interface AppOptions {
   pipelineDefaults: PipelineConfig;
   run: (
-    job: { input: string; maxResults: number },
+    job: { input: string; maxResults: number; counterpoint?: boolean },
     config: PipelineConfig,
     byok: boolean,
   ) => Promise<SuggestResult>;
   queueAvailable: boolean;
   webDistPath: string;
   version?: string;
+  /** Batch is a self-host/desktop tier capability (spec §9). */
+  allowBatch?: boolean;
+  /** Screenshot engine, injected by tiers that have one (ADR-0005 layer 3). */
+  screenshot?: (url: string) => Promise<string | undefined>;
 }
 
 interface SuggestBody {
@@ -42,6 +46,7 @@ interface SuggestBody {
    */
   provider?: { url?: string; apiKey?: string; model?: string };
   youtubeApiKey?: string;
+  counterpoint?: boolean;
 }
 
 export function createApp(options: AppOptions): express.Express {
@@ -58,6 +63,10 @@ export function createApp(options: AppOptions): express.Express {
         thumbnails: 'ok',
         llm: options.pipelineDefaults.ollamaUrl ? 'configured' : 'unavailable',
         queue: options.queueAvailable ? 'ok' : 'unavailable',
+      },
+      capabilities: {
+        batch: Boolean(options.allowBatch),
+        screenshots: Boolean(options.screenshot),
       },
     });
   });
@@ -88,21 +97,14 @@ export function createApp(options: AppOptions): express.Express {
       res.status(400).json({ error: 'input is required' });
       return;
     }
-    const byok = Boolean(body.provider?.url || body.youtubeApiKey);
-    const pipelineConfig: PipelineConfig = {
-      ...options.pipelineDefaults,
-      ...(body.provider?.url
-        ? {
-            ollamaUrl: body.provider.url,
-            ollamaApiKey: body.provider.apiKey,
-            ollamaModel: body.provider.model,
-          }
-        : {}),
-      ...(body.youtubeApiKey ? { youtubeApiKey: body.youtubeApiKey } : {}),
-    };
+    const { pipelineConfig, byok } = mergeConfig(body);
     try {
       const result = await options.run(
-        { input, maxResults: clamp(body.maxResults ?? 10, 1, 25) },
+        {
+          input,
+          maxResults: clamp(body.maxResults ?? 10, 1, 25),
+          counterpoint: Boolean(body.counterpoint),
+        },
         pipelineConfig,
         byok,
       );
@@ -127,6 +129,61 @@ export function createApp(options: AppOptions): express.Express {
       });
     }
   });
+
+  // Batch input (spec §9): a self-host/desktop tier capability. Runs
+  // inline — the batch helper manages its own concurrency.
+  app.post('/api/batch', async (req, res) => {
+    if (!options.allowBatch) {
+      res.status(403).json({
+        error: 'Batch input is a self-host/desktop feature on this instance.',
+      });
+      return;
+    }
+    const body = req.body as SuggestBody & { topics?: string[] };
+    const topics = (body.topics ?? []).filter((t) => typeof t === 'string');
+    if (!topics.length) {
+      res.status(400).json({ error: 'topics[] is required' });
+      return;
+    }
+    const { pipelineConfig } = mergeConfig(body);
+    try {
+      const { suggestBatch, toBatchMarkdown } = await import(
+        '@michaelborck/bowerbird-core'
+      );
+      const entries = await suggestBatch(topics, pipelineConfig, {
+        maxResults: clamp(body.maxResults ?? 10, 1, 25),
+        counterpoint: Boolean(body.counterpoint),
+      });
+      if (body.format === 'markdown') {
+        res.type('text/markdown').send(toBatchMarkdown(entries));
+      } else {
+        res.json({ entries });
+      }
+    } catch (error) {
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  function mergeConfig(body: SuggestBody): { pipelineConfig: PipelineConfig; byok: boolean } {
+    const byok = Boolean(body.provider?.url || body.youtubeApiKey);
+    return {
+      byok,
+      pipelineConfig: {
+        ...options.pipelineDefaults,
+        ...(body.provider?.url
+          ? {
+              ollamaUrl: body.provider.url,
+              ollamaApiKey: body.provider.apiKey,
+              ollamaModel: body.provider.model,
+            }
+          : {}),
+        ...(body.youtubeApiKey ? { youtubeApiKey: body.youtubeApiKey } : {}),
+        ...(options.screenshot ? { screenshot: options.screenshot } : {}),
+      },
+    };
+  }
 
   // Document input (spec §13): extract text from PDF, DOCX, TXT or MD.
   const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.txt', '.md']);

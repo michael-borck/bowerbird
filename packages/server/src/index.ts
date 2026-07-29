@@ -25,6 +25,9 @@ const app = createApp({
   queueAvailable: runner.available,
   webDistPath,
   version: process.env.npm_package_version,
+  // Default on for self-hosters; the hosted free tier sets
+  // BOWERBIRD_ALLOW_BATCH=0 (spec §9: batch is a tier feature).
+  allowBatch: process.env.BOWERBIRD_ALLOW_BATCH !== '0',
 });
 
 app.listen(config.port, () => {

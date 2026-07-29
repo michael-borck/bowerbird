@@ -1,4 +1,10 @@
-import type { ComponentState, Resource, SuggestRequest, SuggestResult } from './types.js';
+import type {
+  ComponentState,
+  Resource,
+  Stance,
+  SuggestRequest,
+  SuggestResult,
+} from './types.js';
 import type { PipelineConfig } from './config.js';
 import type { Candidate } from './retrieval/candidates.js';
 import { retrievePapers } from './retrieval/papers.js';
@@ -6,6 +12,7 @@ import { retrievePodcasts } from './retrieval/podcasts.js';
 import { retrieveBooks } from './retrieval/books.js';
 import { retrieveVideos } from './retrieval/videos.js';
 import { retrieveWeb } from './retrieval/web.js';
+import { deriveCounterQueries } from './retrieval/counterpoint.js';
 import { verifyCandidate } from './verify/verify.js';
 import { classifySource } from './enrich/sourceType.js';
 import { fetchPageMeta } from './enrich/page.js';
@@ -20,7 +27,8 @@ const ANNOTATE_CONCURRENCY = 3;
  * List mode (spec §4): input goes in, a verified and annotated resource
  * list comes out. Every enrichment step is individually fallible and
  * non-fatal (ADR-0006); the LLM only annotates what retrieval found
- * (ADR-0011).
+ * (ADR-0011). Counterpoint mode adds a second retrieval pass that
+ * deliberately hunts disagreeing material (spec §3 point 3).
  */
 export async function suggestResources(
   request: SuggestRequest,
@@ -30,6 +38,8 @@ export async function suggestResources(
   if (!input) return { resources: [], componentHealth: {} };
   const maxResults = request.maxResults ?? DEFAULT_MAX_RESULTS;
   const health: Record<string, ComponentState> = {};
+  const seenUrls = new Set<string>();
+  const stats = { thumbnailFailures: 0, llmAttempts: 0, llmSuccesses: 0, enriched: 0 };
 
   // A pasted document is not a search query; derive one (LLM preferred,
   // term-frequency fallback). Short inputs pass through unchanged.
@@ -47,81 +57,147 @@ export async function suggestResources(
     sources.map(([, p]) => p ?? Promise.reject(new Error('not configured'))),
   );
   const candidates: Candidate[] = [];
-  const seenUrls = new Set<string>();
   settled.forEach((outcome, i) => {
     const name = sources[i][0];
     if (outcome.status === 'fulfilled') {
       health[name] = 'ok';
-      for (const candidate of outcome.value) {
-        const key = candidate.url.replace(/\/$/, '').toLowerCase();
-        if (seenUrls.has(key)) continue;
-        seenUrls.add(key);
-        candidates.push(candidate);
-      }
+      candidates.push(...dedupeAgainst(seenUrls, outcome.value));
     } else {
       health[name] = 'unavailable';
     }
   });
 
-  // --- Verify web candidates before selection so dead links don't crowd
-  // out live ones; database-attested candidates are already existence-checked.
-  const verified = new Map<Candidate, Resource['verification']>();
-  await Promise.all(
-    candidates.map(async (c) => {
-      verified.set(c, await verifyCandidate(c));
-    }),
-  );
-  const usable = candidates.filter((c) => verified.get(c) !== 'dead');
+  const selected = await selectUsable(candidates, maxResults, 'supporting');
+  await enrichAll(selected, topic, config, stats);
+  const resources = selected.map(({ resource }) => resource);
 
-  // --- Select a diverse set, then enrich + annotate only the selected ---
-  const preliminary = usable.map((c) => toResource(c, verified.get(c) ?? 'unverified'));
-  const selectedResources = diversify(preliminary, maxResults);
-  const selected = selectedResources.map(
-    (r) => usable[preliminary.indexOf(r)],
-  );
-
-  let thumbnailFailures = 0;
-  let llmSuccesses = 0;
-  let llmAttempts = 0;
-
-  await mapLimit(selected, ANNOTATE_CONCURRENCY, async (candidate, i) => {
-    const resource = selectedResources[i];
-
-    // Page metadata: one fetch covers og:image (ADR-0005 layer 2) and the
-    // extractive description (ADR-0011 rung 2). Only for candidates that
-    // still lack either, and never for DOI links (publisher bot-walls).
-    if ((!candidate.thumbnailUrl || !candidate.description) && !candidate.doi) {
-      try {
-        const meta = await fetchPageMeta(candidate.url);
-        candidate.thumbnailUrl ??= meta.ogImage;
-        candidate.description ??= meta.description;
-        resource.thumbnailUrl = candidate.thumbnailUrl ?? null;
-      } catch {
-        thumbnailFailures += 1;
-      }
+  // --- Counterpoint pass (spec §3 point 3) -----------------------------
+  if (request.counterpoint) {
+    try {
+      const queries = await deriveCounterQueries(topic, config);
+      const counterSettled = await Promise.allSettled(
+        queries.flatMap((q) => [
+          retrievePapers(q, config.mailto),
+          ...(config.searxngUrl ? [retrieveWeb(q, config.searxngUrl)] : []),
+        ]),
+      );
+      const counterCandidates = dedupeAgainst(
+        seenUrls,
+        counterSettled.flatMap((o) => (o.status === 'fulfilled' ? o.value : [])),
+      );
+      const counterCount = Math.max(2, Math.floor(maxResults / 3));
+      const counterSelected = await selectUsable(
+        counterCandidates,
+        counterCount,
+        'counterpoint',
+      );
+      await enrichAll(counterSelected, topic, config, stats);
+      resources.push(...counterSelected.map(({ resource }) => resource));
+      health.counterpoint = counterSelected.length > 0 ? 'ok' : 'degraded';
+    } catch {
+      health.counterpoint = 'unavailable';
     }
-
-    if (config.ollamaUrl) llmAttempts += 1;
-    resource.annotation = await annotate(topic, candidate, config, true);
-    if (resource.annotation.source === 'llm') llmSuccesses += 1;
-  });
+  }
 
   health.thumbnails =
-    thumbnailFailures === 0 ? 'ok' : thumbnailFailures < selected.length ? 'degraded' : 'unavailable';
+    stats.thumbnailFailures === 0
+      ? 'ok'
+      : stats.thumbnailFailures < stats.enriched
+        ? 'degraded'
+        : 'unavailable';
   health.llm = !config.ollamaUrl
     ? 'unavailable'
-    : llmSuccesses === llmAttempts
+    : stats.llmSuccesses === stats.llmAttempts
       ? 'ok'
-      : llmSuccesses > 0
+      : stats.llmSuccesses > 0
         ? 'degraded'
         : 'unavailable';
 
-  return { resources: selectedResources, componentHealth: health };
+  return { resources, componentHealth: health };
+
+  /** Verify, drop dead links, pick a diverse set, pair candidate+resource. */
+  async function selectUsable(
+    pool: Candidate[],
+    count: number,
+    stance: Stance,
+  ): Promise<Array<{ candidate: Candidate; resource: Resource }>> {
+    const verified = new Map<Candidate, Resource['verification']>();
+    await Promise.all(
+      pool.map(async (c) => {
+        verified.set(c, await verifyCandidate(c));
+      }),
+    );
+    const usable = pool.filter((c) => verified.get(c) !== 'dead');
+    const preliminary = usable.map((c) =>
+      toResource(c, verified.get(c) ?? 'unverified', stance),
+    );
+    const chosen = diversify(preliminary, count);
+    return chosen.map((resource) => ({
+      candidate: usable[preliminary.indexOf(resource)],
+      resource,
+    }));
+  }
+
+  /** Page-meta + screenshot thumbnails (ADR-0005) and annotation (ADR-0011). */
+  async function enrichAll(
+    pairs: Array<{ candidate: Candidate; resource: Resource }>,
+    annotateTopic: string,
+    cfg: PipelineConfig,
+    s: typeof stats,
+  ): Promise<void> {
+    s.enriched += pairs.length;
+    await mapLimit(pairs, ANNOTATE_CONCURRENCY, async ({ candidate, resource }) => {
+      if ((!candidate.thumbnailUrl || !candidate.description) && !candidate.doi) {
+        try {
+          const meta = await fetchPageMeta(candidate.url);
+          candidate.thumbnailUrl ??= meta.ogImage;
+          candidate.description ??= meta.description;
+          resource.thumbnailUrl = candidate.thumbnailUrl ?? null;
+        } catch {
+          s.thumbnailFailures += 1;
+        }
+      }
+      // Layer 3 (ADR-0005): full screenshot, only where a tier injected a
+      // capture engine and cheaper layers produced nothing.
+      if (!resource.thumbnailUrl && cfg.screenshot) {
+        try {
+          resource.thumbnailUrl = (await cfg.screenshot(candidate.url)) ?? null;
+        } catch {
+          // screenshots are a bonus, never a failure
+        }
+      }
+      if (cfg.ollamaUrl) s.llmAttempts += 1;
+      resource.annotation = await annotate(
+        annotateTopic,
+        candidate,
+        cfg,
+        true,
+        resource.stance,
+      );
+      if (resource.annotation.source === 'llm') s.llmSuccesses += 1;
+    });
+  }
 }
 
-function toResource(candidate: Candidate, verification: Resource['verification']): Resource {
+function dedupeAgainst(seen: Set<string>, incoming: Candidate[]): Candidate[] {
+  const out: Candidate[] = [];
+  for (const candidate of incoming) {
+    const key = candidate.url.replace(/\/$/, '').toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(candidate);
+  }
+  return out;
+}
+
+function toResource(
+  candidate: Candidate,
+  verification: Resource['verification'],
+  stance: Stance,
+): Resource {
   const { sourceType, commerciallyInterested } = classifySource(candidate);
   return {
+    stance,
     title: candidate.title,
     url: candidate.url,
     format: candidate.format,

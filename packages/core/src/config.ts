@@ -16,6 +16,14 @@ export interface PipelineConfig {
   searxngUrl?: string;
   /** Contact email passed to polite-pool APIs (Crossref/OpenAlex). */
   mailto?: string;
+  /**
+   * Full-page screenshot capture, ADR-0005 layer 3. Injected by the tier
+   * that has a browser engine (desktop: Electron capturePage; self-host:
+   * Playwright). Returns a data URL or undefined. Never set on the free
+   * hosted tier — rendering arbitrary URLs server-side is an SSRF and
+   * cost surface.
+   */
+  screenshot?: (url: string) => Promise<string | undefined>;
 }
 
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): PipelineConfig {

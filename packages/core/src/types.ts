@@ -48,7 +48,14 @@ export interface Annotation {
   text: string | null;
 }
 
+/**
+ * Whether a resource supports the input's framing or was deliberately
+ * retrieved to challenge it (counterpoint mode, spec §3 point 3).
+ */
+export type Stance = 'supporting' | 'counterpoint';
+
 export interface Resource {
+  stance: Stance;
   title: string;
   url: string;
   format: ResourceFormat;
@@ -72,6 +79,11 @@ export interface SuggestRequest {
   /** A topic string, or extracted text from an uploaded document. */
   input: string;
   maxResults?: number;
+  /**
+   * Counterpoint mode: additionally retrieve material that disagrees with
+   * or complicates the input's framing, clearly labelled (spec §3).
+   */
+  counterpoint?: boolean;
 }
 
 export type ComponentState = 'ok' | 'degraded' | 'unavailable';
