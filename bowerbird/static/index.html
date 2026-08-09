@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bower</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --hairline: #e1e0d9; --baseline: #c3c2b7; --ring: rgba(11,11,11,0.10);
+    --accent: #2a78d6; --accent-soft: #cde2fb; --seq-400: #3987e5; --seq-550: #1c5cab;
+    --st-live: #0ca30c; --st-login: #fab219; --st-blocked: #ec835a; --st-dead: #d03b3b;
+    --st-unchecked: #898781; --chip-bg: #f0efec; --sidebar: #f2f1ed;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+      --muted: #898781; --hairline: #2c2c2a; --baseline: #383835; --ring: rgba(255,255,255,0.10);
+      --accent: #3987e5; --accent-soft: #10315c; --seq-400: #3987e5; --seq-550: #6da7ec;
+      --chip-bg: #262624; --sidebar: #141413;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+    --muted: #898781; --hairline: #2c2c2a; --baseline: #383835; --ring: rgba(255,255,255,0.10);
+    --accent: #3987e5; --accent-soft: #10315c; --seq-400: #3987e5; --seq-550: #6da7ec;
+    --chip-bg: #262624; --sidebar: #141413;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 15px/1.5 "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .app { display: flex; min-height: 100vh; }
+  .side { width: 218px; flex: none; background: var(--sidebar); border-right: 1px solid var(--hairline);
+          padding: 22px 14px 16px; display: flex; flex-direction: column; gap: 4px;
+          position: sticky; top: 0; height: 100vh; }
+  .wordmark { display: flex; align-items: center; gap: 9px; padding: 0 8px 16px; }
+  .wordmark .name { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  .wordmark .sub { font-size: 11px; color: var(--muted); display: block; margin-top: -3px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px;
+              border: none; width: 100%; background: none; color: var(--ink-2); font: inherit;
+              font-size: 14px; cursor: pointer; text-align: left; }
+  .nav-item:hover { background: var(--chip-bg); }
+  .nav-item.active { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+  .nav-item .count { margin-left: auto; font-size: 11.5px; color: var(--muted);
+                     font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .nav-item:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
+    { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .side .foot { margin-top: auto; padding: 10px 8px 0; border-top: 1px solid var(--hairline); }
+  .pipeline { font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+  .pipeline .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+                   background: var(--st-live); margin-right: 5px; }
+  .main { flex: 1; min-width: 0; padding: 26px 32px 48px; }
+  .screen { display: none; max-width: 1060px; }
+  .screen.active { display: block; }
+  h1 { font-size: 21px; font-weight: 700; margin: 0 0 2px; letter-spacing: -0.01em; }
+  .h-sub { color: var(--ink-2); font-size: 13.5px; margin: 0 0 22px; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted);
+             font-weight: 600; margin: 0 0 10px; }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 18px 20px; }
+  .grid { display: grid; gap: 14px; }
+  .tiles { grid-template-columns: repeat(5, 1fr); margin-bottom: 14px; }
+  .tile .label { font-size: 12px; color: var(--ink-2); margin-bottom: 4px; }
+  .tile .value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .tile .value .pct { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+  .tile .note { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .stack { display: flex; gap: 2px; height: 26px; border-radius: 5px; overflow: hidden; margin: 14px 0 12px; }
+  .stack .seg { min-width: 3px; }
+  .stack .seg:hover { filter: brightness(1.12); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 12.5px; color: var(--ink-2); }
+  .legend .key { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .legend .n { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: var(--muted); }
+  .barrow { display: grid; grid-template-columns: 140px 1fr 56px; align-items: center; gap: 10px;
+            padding: 3px 0; font-size: 13px; }
+  .barrow .bl { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .barrow .track { height: 14px; }
+  .barrow .fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--seq-400);
+                  min-width: 3px; display: block; }
+  .barrow:hover .fill { background: var(--seq-550); }
+  .barrow .bn { text-align: right; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+                font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cols { display: flex; align-items: flex-end; gap: 10px; height: 120px; padding-top: 6px; }
+  .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
+  .col .bar { width: 100%; max-width: 46px; background: var(--seq-400); border-radius: 4px 4px 0 0;
+              min-height: 3px; }
+  .col:hover .bar { background: var(--seq-550); }
+  .col .yl { font-size: 11px; color: var(--muted); }
+  .col .yv { font-size: 10.5px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .annot { font-size: 11.5px; color: var(--ink-2); border-left: 2px solid var(--baseline);
+           padding-left: 8px; margin-top: 10px; }
+  .two { grid-template-columns: 1fr 1fr; align-items: start; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
+          padding: 2px 8px; border-radius: 999px; background: var(--chip-bg); white-space: nowrap; }
+  .pill .sdot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--st-unchecked); }
+  .pill.live .sdot { background: var(--st-live); } .pill.login_wall .sdot { background: var(--st-login); }
+  .pill.blocked .sdot { background: var(--st-blocked); } .pill.dead .sdot { background: var(--st-dead); }
+  .topic { display: inline-block; font-size: 11.5px; color: var(--ink-2); background: var(--chip-bg);
+           border-radius: 5px; padding: 1.5px 7px; margin-right: 4px; white-space: nowrap; }
+  .searchbar { display: flex; gap: 10px; margin-bottom: 12px; }
+  .searchbar input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--baseline);
+                     background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
+  .facets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; font-size: 12.5px; align-items: center; }
+  .facet { padding: 4px 11px; border-radius: 999px; border: 1px solid var(--baseline);
+           background: var(--surface); color: var(--ink-2); cursor: pointer; font: inherit; font-size: 12.5px; }
+  .facet.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 600; }
+  select.facet { padding: 4px 8px; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+       color: var(--muted); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--hairline);
+       white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  tr:hover td { background: var(--chip-bg); }
+  td .t { font-weight: 600; display: block; max-width: 420px; overflow: hidden;
+          text-overflow: ellipsis; white-space: nowrap; }
+  td .t a { color: inherit; text-decoration: none; }
+  td .t a:hover { color: var(--accent); }
+  td .u { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; color: var(--muted);
+          display: block; max-width: 420px; overflow: hidden; text-overflow: ellipsis;
+          white-space: nowrap; margin-top: 2px; }
+  td.num { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--muted);
+           white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .btn { font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 7px;
+         border: 1px solid var(--baseline); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .btn:hover { background: var(--chip-bg); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.sm { font-size: 12px; padding: 4px 10px; }
+  .grave-row { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center;
+               padding: 12px 0; border-bottom: 1px solid var(--hairline); }
+  .grave-row:last-child { border-bottom: none; }
+  .grave-title { font-weight: 600; }
+  .grave-title a { color: inherit; text-decoration: none; }
+  .grave-title a:hover { color: var(--accent); }
+  .grave-url { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+               color: var(--muted); display: block; max-width: 640px; overflow: hidden;
+               text-overflow: ellipsis; white-space: nowrap; }
+  .grave-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .actions { display: flex; gap: 6px; flex: none; }
+  .deck { grid-template-columns: repeat(3, 1fr); }
+  .deckcard { display: flex; flex-direction: column; gap: 8px; }
+  .deckcard .dom { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+                   color: var(--muted); font-weight: 600; }
+  .deckcard .dt { font-weight: 650; font-size: 14.5px; line-height: 1.35; }
+  .deckcard .dt a { color: inherit; text-decoration: none; }
+  .deckcard .dt a:hover { color: var(--accent); }
+  .deckcard .meta { font-size: 12px; color: var(--muted); }
+  .deckcard .row { display: flex; gap: 6px; margin-top: auto; padding-top: 8px; }
+  .section { margin-bottom: 20px; }
+  .loadmore { margin-top: 12px; }
+  @media (max-width: 900px) {
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .two, .deck { grid-template-columns: 1fr; }
+    .side { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side">
+    <div class="wordmark">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+        <circle cx="15" cy="15" r="14" fill="var(--accent-soft)"/>
+        <path d="M6 20 Q15 10 24 20" stroke="var(--accent)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <path d="M9 21.5 Q15 14.5 21 21.5" stroke="var(--accent)" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.55"/>
+        <circle cx="15" cy="12" r="2.4" fill="var(--accent)"/>
+      </svg>
+      <div><span class="name">Bower</span><span class="sub">bookmark curator</span></div>
+    </div>
+    <button class="nav-item active" data-screen="dashboard">Dashboard</button>
+    <button class="nav-item" data-screen="library">Library <span class="count" id="nav-lib"></span></button>
+    <button class="nav-item" data-screen="ask">Ask</button>
+    <button class="nav-item" data-screen="graveyard">Graveyard <span class="count" id="nav-grave"></span></button>
+    <button class="nav-item" data-screen="duplicates">Duplicates <span class="count" id="nav-dupes"></span></button>
+    <button class="nav-item" data-screen="domains">Domains</button>
+    <button class="nav-item" data-screen="topicmap">Topic map</button>
+    <button class="nav-item" data-screen="rediscover">Rediscover</button>
+    <div class="foot"><div class="pipeline" id="pipeline"><span class="dot"></span>loading…</div></div>
+  </nav>
+
+  <main class="main">
+    <section class="screen active" id="dashboard">
+      <h1>Dashboard</h1>
+      <p class="h-sub" id="dash-sub">loading…</p>
+      <div class="grid tiles section" id="tiles"></div>
+      <div class="card section">
+        <p class="eyebrow" id="health-eyebrow">Link health</p>
+        <div class="stack" id="health-stack"></div>
+        <div class="legend" id="health-legend"></div>
+      </div>
+      <div class="grid two section">
+        <div class="card">
+          <p class="eyebrow">Topics · from your folders, pre-LLM</p>
+          <div id="topics"></div>
+        </div>
+        <div>
+          <div class="card section">
+            <p class="eyebrow">Top domains</p>
+            <div id="domains"></div>
+          </div>
+          <div class="card">
+            <p class="eyebrow">Sources</p>
+            <div id="sources"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card section">
+        <p class="eyebrow">Added per year</p>
+        <div class="cols" id="years"></div>
+        <div class="annot">A large single-year spike usually marks a browser import re-stamping add-dates, not a bookmarking frenzy.</div>
+      </div>
+    </section>
+
+    <section class="screen" id="library">
+      <h1>Library</h1>
+      <p class="h-sub" id="lib-sub"></p>
+      <div class="searchbar">
+        <input type="search" id="q" placeholder="Search titles, URLs, page text and topics…" aria-label="Search bookmarks">
+        <button class="btn primary" id="go">Search</button>
+      </div>
+      <div class="facets" id="lib-facets">
+        <select class="facet" id="f-status" aria-label="Status filter">
+          <option value="">Status: All</option>
+          <option value="live">Live</option><option value="login_wall">Login-walled</option>
+          <option value="blocked">Blocked</option><option value="suspect">Suspect</option>
+          <option value="dead">Dead</option><option value="timeout">Timeout</option>
+          <option value="error">Error</option><option value="unchecked">Unchecked</option>
+        </select>
+        <span id="source-chips"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:235px 1fr;gap:14px;align-items:start">
+        <div class="card" id="topic-tree" style="padding:12px 10px;max-height:72vh;overflow-y:auto"></div>
+        <div>
+          <div class="card tablewrap">
+            <table>
+              <thead><tr><th>Bookmark</th><th>Topics</th><th>Source</th><th>Status</th><th>Last visited</th></tr></thead>
+              <tbody id="lib-rows"></tbody>
+            </table>
+          </div>
+          <button class="btn loadmore" id="more">Load more</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="ask">
+      <h1>Ask your bookmarks</h1>
+      <p class="h-sub">Ask a question — Bower finds saved links that might help. It never answers from the web; every result is something you bookmarked.</p>
+      <div class="searchbar">
+        <input type="search" id="ask-q" placeholder="e.g. how do I calibrate a 3D printer bed? · what did I save about topic modelling?" aria-label="Question">
+        <button class="btn primary" id="ask-go">Ask</button>
+      </div>
+      <div id="ask-out"></div>
+    </section>
+
+    <section class="screen" id="domains">
+      <h1>Domain triage</h1>
+      <p class="h-sub" id="dom-sub">One decision retires a whole domain. “Let go” marks every unreviewed link on the domain retired (applied at write-back, reversible until then); “Keep” records them as deliberate.</p>
+      <div class="card" id="dom-rows"></div>
+    </section>
+
+    <section class="screen" id="topicmap">
+      <h1>Topic map</h1>
+      <p class="h-sub">Your collection's themes — node size is bookmark count, links join topics that share bookmarks. Click a topic to browse it in the Library.</p>
+      <div class="card" style="padding:8px">
+        <canvas id="mapcanvas" width="1000" height="640" style="width:100%;height:auto;cursor:pointer"></canvas>
+      </div>
+    </section>
+
+    <section class="screen" id="graveyard">
+      <h1>Graveyard</h1>
+      <p class="h-sub" id="grave-sub"></p>
+      <div class="facets" id="grave-bulk"></div>
+      <div class="card" id="grave-rows"></div>
+      <p class="h-sub" style="margin-top:10px">“Replace” swaps the link for its Wayback snapshot, “Let go” retires it — both are recorded decisions applied at write-back, never silently. Run <code>bowerbird wayback</code> to look up snapshots, and <code>bowerbird writeback --source-id 1</code> for a dry-run of the changes.</p>
+    </section>
+
+    <section class="screen" id="duplicates">
+      <h1>Duplicates</h1>
+      <p class="h-sub" id="dupes-sub"></p>
+      <div class="card" id="dupes-rows"></div>
+      <p class="h-sub" style="margin-top:10px">Duplicates are within one browser only — the same link saved in two browsers is intentional. The kept copy is the one filed most specifically; collapsing happens at write-back (Phase 4), nothing is removed yet.</p>
+    </section>
+
+    <section class="screen" id="rediscover">
+      <h1>Rediscover</h1>
+      <p class="h-sub">Bookmarks you saved and (as far as your browsers' history knows) never went back to. One domain each.</p>
+      <div class="grid deck" id="deck"></div>
+      <button class="btn loadmore" id="shuffle">Shuffle</button>
+    </section>
+  </main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n) => (n ?? 0).toLocaleString("en-AU");
+const short = (u) => u.replace(/^https?:\/\/(www\.)?/, "").slice(0, 80);
+
+const STATUS_META = {
+  live:       ["✓ Live",              "var(--st-live)"],
+  login_wall: ["🔒 Login-walled",     "var(--st-login)"],
+  blocked:    ["⛉ Blocked, not dead", "var(--st-blocked)"],
+  suspect:    ["? Suspect",           "var(--st-unchecked)"],
+  dead:       ["✕ Dead",              "var(--st-dead)"],
+  timeout:    ["◌ Timeout",           "var(--baseline)"],
+  error:      ["◌ Unreachable",       "var(--baseline)"],
+  unchecked:  ["· Unchecked",         "var(--chip-bg)"],
+  skipped:    ["– Skipped",           "var(--chip-bg)"],
+};
+const PILL_LABEL = { live:"Live", login_wall:"Login-walled", blocked:"Blocked, not dead",
+  suspect:"Suspect", dead:"Dead", timeout:"Timeout", error:"Unreachable",
+  unchecked:"Unchecked", skipped:"Skipped" };
+
+let libOffset = 0, libFilters = { q:"", status:"", source_id:"", topic:"" };
+
+document.querySelectorAll(".nav-item").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(btn.dataset.screen).classList.add("active");
+}));
+
+function bars(el, entries, labelWidth) {
+  const max = Math.max(...entries.map(e => e[1]), 1);
+  el.innerHTML = entries.map(([label, n]) => `
+    <div class="barrow"><span class="bl" title="${esc(label)}">${esc(label)}</span>
+      <span class="track"><span class="fill" style="width:${Math.max(100*n/max, 1)}%"></span></span>
+      <span class="bn">${fmt(n)}</span></div>`).join("");
+}
+
+async function loadSummary() {
+  const s = await (await fetch("/api/summary")).json();
+  const sc = s.status_counts, alive = (sc.live||0) + (sc.login_wall||0);
+  const unreachable = (sc.timeout||0) + (sc.error||0);
+  const graveN = (sc.dead||0) + unreachable + (sc.suspect||0);
+  const checked = Object.entries(sc).filter(([k]) => !["unchecked","skipped"].includes(k))
+                        .reduce((a,[,v]) => a+v, 0);
+  $("#nav-lib").textContent = fmt(s.unique_urls);
+  $("#nav-grave").textContent = fmt(graveN);
+  $("#pipeline").innerHTML = `<span class="dot"></span>${fmt(checked)} URLs validated<br>` +
+    (s.last_checked ? `last sweep ${s.last_checked.slice(0,10)}` : "no sweep yet");
+  $("#dash-sub").textContent =
+    `${fmt(s.total_bookmarks)} bookmarks across ${s.sources.length} source${s.sources.length===1?"":"s"} · ` +
+    `${fmt(s.unique_urls)} unique URLs` + (s.last_checked ? ` · sweep of ${s.last_checked.slice(0,10)}` : "");
+  $("#lib-sub").textContent = `${fmt(s.unique_urls)} unique bookmarks · search covers titles, URLs and folders`;
+
+  const pct = (n) => checked ? ` <span class="pct">${(100*n/checked).toFixed(1)}%</span>` : "";
+  $("#tiles").innerHTML = `
+    <div class="card tile"><div class="label">Bookmarks</div><div class="value">${fmt(s.total_bookmarks)}</div>
+      <div class="note">${fmt(s.unique_urls)} unique after canonicalise</div></div>
+    <div class="card tile"><div class="label">Duplicates</div><div class="value">${fmt(s.duplicates)}</div>
+      <div class="note">entries that collapse on write-back</div></div>
+    <div class="card tile"><div class="label">Dead links</div><div class="value">${fmt(sc.dead||0)}${pct(sc.dead||0)}</div>
+      <div class="note">+${fmt(unreachable)} on unreachable hosts</div></div>
+    <div class="card tile"><div class="label">Login-walled</div><div class="value">${fmt(sc.login_wall||0)}</div>
+      <div class="note">login page reached — counted alive</div></div>
+    <div class="card tile"><div class="label">Never revisited</div>
+      <div class="value">${s.total_bookmarks ? Math.round(100*(1 - s.visited_recently/s.total_bookmarks)) : 0}%</div>
+      <div class="note">${fmt(s.visited_recently)} visited in recent browser history</div></div>`;
+
+  $("#health-eyebrow").textContent = `Link health · ${fmt(checked)} unique URLs checked`;
+  const order = ["live","login_wall","blocked","suspect","dead","timeout","error","unchecked"];
+  $("#health-stack").innerHTML = order.filter(k => sc[k]).map(k =>
+    `<div class="seg" style="flex:${sc[k]}; background:${STATUS_META[k][1]}"
+          title="${PILL_LABEL[k]} — ${fmt(sc[k])}"></div>`).join("");
+  $("#health-legend").innerHTML = order.filter(k => sc[k]).map(k =>
+    `<span class="key"><span class="swatch" style="background:${STATUS_META[k][1]}"></span>` +
+    `${STATUS_META[k][0]} <span class="n">${fmt(sc[k])}</span></span>`).join("");
+
+  bars($("#topics"), s.topics);
+  bars($("#domains"), s.domains);
+  $("#sources").innerHTML = s.sources.map(src => `
+    <div class="barrow"><span class="bl">${esc(src.browser)} · ${esc(src.profile)}</span>
+      <span class="track"></span><span class="bn">${fmt(src.bookmarks)}</span></div>`).join("");
+  $("#source-chips").innerHTML =
+    `<button class="facet on" data-src="">All sources</button>` +
+    s.sources.filter(src => src.bookmarks > 0).map(src =>
+      `<button class="facet" data-src="${src.id}">${esc(src.browser)} · ${esc(src.profile)}</button>`).join("");
+  document.querySelectorAll("#source-chips .facet").forEach(chip => chip.addEventListener("click", () => {
+    document.querySelectorAll("#source-chips .facet").forEach(c => c.classList.remove("on"));
+    chip.classList.add("on");
+    libFilters.source_id = chip.dataset.src;
+    loadLibrary(true);
+  }));
+
+  const ymax = Math.max(...s.years.map(([,n]) => n), 1);
+  $("#years").innerHTML = s.years.map(([y,n]) => `
+    <div class="col" title="${y} — ${fmt(n)}">
+      <div class="bar" style="height:${Math.max(100*n/ymax,2)}%"></div>
+      <span class="yl">’${y.slice(2)}</span><span class="yv">${fmt(n)}</span></div>`).join("");
+}
+
+async function loadLibrary(reset) {
+  if (reset) libOffset = 0;
+  const p = new URLSearchParams({ q: libFilters.q, status: libFilters.status,
+    limit: 50, offset: libOffset });
+  if (libFilters.source_id) p.set("source_id", libFilters.source_id);
+  if (libFilters.topic) p.set("topic", libFilters.topic);
+  const data = await (await fetch("/api/bookmarks?" + p)).json();
+  const html = data.rows.map(r => `
+    <tr><td><span class="t"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a></span>
+        <span class="u">${esc(short(r.url))}</span></td>
+      <td>${(r.topics || [r.topic]).slice(0,3).map(t => `<span class="topic">${esc(t)}</span>`).join("")}</td>
+      <td class="num">${esc(r.browser)}</td>
+      <td><span class="pill ${esc(r.status||"unchecked")}"><span class="sdot"></span>${PILL_LABEL[r.status] || "Unchecked"}</span></td>
+      <td class="num">${r.last_visit ? esc(r.last_visit.slice(0,10)) : "—"}</td></tr>`).join("");
+  if (reset) $("#lib-rows").innerHTML = html; else $("#lib-rows").insertAdjacentHTML("beforeend", html);
+  libOffset += data.rows.length;
+  $("#more").style.display = libOffset < data.total ? "" : "none";
+  $("#lib-sub").textContent = `${fmt(data.total)} matching · showing ${fmt(libOffset)}`;
+}
+
+async function loadGraveyard() {
+  const data = await (await fetch("/api/graveyard")).json();
+  const c = data.counts;
+  $("#grave-sub").textContent =
+    `${fmt(c.dead||0)} confirmed dead · ${fmt((c.error||0)+(c.timeout||0))} unreachable · ` +
+    `${fmt(c.suspect||0)} suspect · ${fmt(data.snapshots)} with a Wayback snapshot · ` +
+    `${fmt(data.reviewed)} reviewed so far`;
+  $("#grave-bulk").innerHTML =
+    (data.snapshots ? `<button class="btn sm primary" onclick="bulk('replace_snapshots')">Replace all with Wayback snapshots (${fmt(data.snapshots)})</button>` : "") +
+    (data.no_snapshot ? `<button class="btn sm" onclick="bulk('let_go_no_snapshot')">Let go all without a snapshot (${fmt(data.no_snapshot)})</button>` : "");
+  $("#grave-rows").innerHTML = data.rows.map(r => `
+    <div class="grave-row" id="grave-${r.id}">
+      <div>
+        <span class="grave-title"><a href="${esc(r.check_url)}" target="_blank" rel="noopener">${esc(r.title || r.check_url)}</a></span>
+        <span class="grave-url">${esc(short(r.check_url))}</span>
+        <div class="grave-meta">${PILL_LABEL[r.status]}${r.http_status ? " · HTTP " + r.http_status : ""}` +
+        `${r.reason ? " · " + esc(r.reason.slice(0,90)) : ""} · <span class="topic">${esc(r.topic)}</span>` +
+        `${r.wayback_url ? ` · <a href="${esc(r.wayback_url)}" target="_blank" rel="noopener">◷ snapshot ${r.wayback_at ? esc(r.wayback_at.slice(0,4)) : ""}</a>` : ""}</div>
+      </div>
+      <div class="actions">
+        ${r.wayback_url ? `<button class="btn sm primary" onclick="review(${r.id},'replace')">Replace</button>` : ""}
+        <button class="btn sm" onclick="review(${r.id},'keep')">Keep</button>
+        <button class="btn sm" onclick="review(${r.id},'let_go')">Let go</button>
+      </div>
+    </div>`).join("") || "<p class='h-sub'>Queue is empty — everything has been reviewed. 🎉</p>";
+}
+
+async function bulk(scope) {
+  const resp = await fetch("/api/graveyard/bulk", { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope }) });
+  const data = await resp.json();
+  await loadGraveyard();
+}
+
+async function review(id, decision) {
+  await fetch(`/api/urls/${id}/review`, { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) });
+  const row = document.getElementById("grave-" + id);
+  if (row) row.remove();
+}
+
+async function loadTopicTree() {
+  const data = await (await fetch("/api/topics")).json();
+  const tops = {};
+  data.topics.forEach(t => {
+    const [top, child] = t.path.split(" / ");
+    tops[top] = tops[top] || { n: 0, children: [] };
+    if (child) tops[top].children.push({ path: t.path, name: child, n: t.n });
+    else tops[top].n = t.n;
+  });
+  const btn = (path, label, n, indent) =>
+    `<button class="facet topic-btn" data-topic="${esc(path)}"
+       style="display:block;width:100%;text-align:left;border:none;background:none;
+              padding:3px 6px 3px ${indent}px;border-radius:5px;font-size:12.5px">
+       ${esc(label)} <span style="color:var(--muted);font-size:11px">${n ? fmt(n) : ""}</span></button>`;
+  $("#topic-tree").innerHTML =
+    `<p class="eyebrow" style="margin:2px 6px 8px">Topics</p>` +
+    btn("", "All topics", 0, 6) +
+    Object.keys(tops).sort().map(top => {
+      const t = tops[top];
+      const total = t.n + t.children.reduce((a, c) => a + c.n, 0);
+      return btn(top, top, total, 6) +
+        t.children.sort((a,b) => b.n - a.n).map(c => btn(c.path, c.name, c.n, 20)).join("");
+    }).join("");
+  document.querySelectorAll(".topic-btn").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".topic-btn").forEach(x => x.style.background = "none");
+    b.style.background = "var(--accent-soft)";
+    libFilters.topic = b.dataset.topic;
+    loadLibrary(true);
+  }));
+}
+
+async function askQuestion() {
+  const question = $("#ask-q").value.trim();
+  if (!question) return;
+  $("#ask-out").innerHTML = "<p class='h-sub'>Searching your bookmarks…</p>";
+  try {
+    const resp = await fetch("/api/chat", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const data = await resp.json();
+    $("#ask-out").innerHTML =
+      data.groups.map(g => `
+        <div class="card section">
+          <p class="eyebrow">${esc(g.theme)}</p>
+          ${g.items.map(it => `
+            <div class="grave-row"><div>
+              <span class="grave-title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a></span>
+              <span class="grave-url">${esc(short(it.url))}</span>
+              <div class="grave-meta">${esc(it.why)}${it.status && it.status !== "live" ? ` · <span class="pill ${esc(it.status)}"><span class="sdot"></span>${PILL_LABEL[it.status]}</span>` : ""}</div>
+            </div></div>`).join("")}
+        </div>`).join("") +
+      (data.note ? `<p class="h-sub">${esc(data.note)}</p>` : "") ||
+      "<p class='h-sub'>Nothing relevant found in your collection.</p>";
+  } catch (err) {
+    $("#ask-out").innerHTML = `<p class="h-sub">Something went wrong: ${esc(err.message)}</p>`;
+  }
+}
+
+async function loadDomains() {
+  const data = await (await fetch("/api/domains")).json();
+  $("#dom-rows").innerHTML = data.domains.map(d => `
+    <div class="grave-row" id="dom-${esc(d.domain).replace(/[^a-z0-9]/gi,'_')}">
+      <div>
+        <span class="grave-title">${esc(d.domain)}</span>
+        <div class="grave-meta">${fmt(d.total)} links · ${fmt(d.alive)} alive · ${fmt(d.dead)} dead ·
+          ${fmt(d.visited)} visited recently${d.reviewed ? ` · ${fmt(d.reviewed)} already reviewed` : ""}</div>
+        <div class="grave-meta" style="color:var(--ink-2)">${d.samples.map(esc).join(" · ")}</div>
+      </div>
+      <div class="actions">
+        <button class="btn sm" onclick="domainReview('${esc(d.domain)}','keep')">Keep all</button>
+        <button class="btn sm" onclick="domainReview('${esc(d.domain)}','let_go')">Let go all</button>
+      </div>
+    </div>`).join("") || "<p class='h-sub'>Every domain with 3+ links has been reviewed. 🎉</p>";
+}
+
+async function domainReview(domain, decision) {
+  await fetch("/api/domains/review", { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain, decision }) });
+  loadDomains();
+}
+
+async function loadTopicMap() {
+  const data = await (await fetch("/api/topicmap")).json();
+  const canvas = $("#mapcanvas"), ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const css = getComputedStyle(document.documentElement);
+  const accent = css.getPropertyValue("--seq-400").trim() || "#3987e5";
+  const ink = css.getPropertyValue("--ink").trim(), muted = css.getPropertyValue("--muted").trim();
+  const surface = css.getPropertyValue("--surface").trim();
+
+  const nodes = data.nodes.map((n, i) => ({ ...n,
+    x: W/2 + Math.cos(i * 2.4) * (120 + (i % 7) * 40),
+    y: H/2 + Math.sin(i * 2.4) * (90 + (i % 5) * 40),
+    r: 4 + Math.sqrt(n.n) * 1.6 }));
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const edges = data.edges.filter(e => byId[e.s] && byId[e.t]);
+
+  for (let iter = 0; iter < 260; iter++) {
+    for (const a of nodes) {
+      let fx = (W/2 - a.x) * 0.002, fy = (H/2 - a.y) * 0.002;
+      for (const b of nodes) {
+        if (a === b) continue;
+        const dx = a.x - b.x, dy = a.y - b.y, d2 = dx*dx + dy*dy + 40;
+        fx += dx / d2 * 900; fy += dy / d2 * 900;
+      }
+      a.fx = fx; a.fy = fy;
+    }
+    for (const e of edges) {
+      const a = byId[e.s], b = byId[e.t];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const k = 0.0015 * Math.min(e.w, 25);
+      a.fx += dx * k; a.fy += dy * k; b.fx -= dx * k; b.fy -= dy * k;
+    }
+    for (const n of nodes) {
+      n.x = Math.max(30, Math.min(W - 30, n.x + n.fx * 6));
+      n.y = Math.max(24, Math.min(H - 24, n.y + n.fy * 6));
+    }
+  }
+
+  function draw(hover) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (const e of edges) {
+      const a = byId[e.s], b = byId[e.t];
+      ctx.strokeStyle = muted; ctx.globalAlpha = Math.min(0.08 + e.w * 0.012, 0.5);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    for (const n of nodes) {
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = n === hover ? 1 : 0.82;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+      if (n.r > 9 || n === hover) {
+        ctx.font = `${n === hover ? "600 " : ""}11px system-ui`;
+        ctx.fillStyle = n === hover ? ink : muted;
+        const label = n.path.split(" / ").pop() + (n === hover ? ` (${n.n})` : "");
+        ctx.strokeStyle = surface; ctx.lineWidth = 3;
+        ctx.strokeText(label, n.x + n.r + 3, n.y + 3);
+        ctx.fillText(label, n.x + n.r + 3, n.y + 3);
+      }
+    }
+  }
+  draw(null);
+
+  const pick = (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) * (W / rect.width);
+    const y = (ev.clientY - rect.top) * (H / rect.height);
+    return nodes.find(n => (n.x-x)**2 + (n.y-y)**2 < (n.r+6)**2);
+  };
+  canvas.onmousemove = (ev) => draw(pick(ev));
+  canvas.onclick = (ev) => {
+    const n = pick(ev);
+    if (!n) return;
+    libFilters.topic = n.path;
+    document.querySelector('[data-screen="library"]').click();
+    loadLibrary(true);
+  };
+}
+
+async function loadDupes() {
+  const data = await (await fetch("/api/duplicates?limit=50")).json();
+  $("#nav-dupes").textContent = fmt(data.total);
+  $("#dupes-sub").textContent =
+    `${fmt(data.total)} duplicate groups · collapsing removes ${fmt(data.total_entries_removed)} bookmark entries · showing ${Math.min(50, data.total)}`;
+  $("#dupes-rows").innerHTML = data.groups.map(g => `
+    <div class="grave-row">
+      <div>
+        <span class="grave-title"><a href="${esc(g.keep.url)}" target="_blank" rel="noopener">${esc(g.keep.title || g.keep.url)}</a></span>
+        <span class="grave-url">${esc(short(g.keep.url))}</span>
+        <div class="grave-meta">${esc(g.browser)} · ${esc(g.profile)} ·
+          keep in <span class="topic">${esc(g.keep.folder_path || "(root)")}</span> ·
+          collapse ${g.collapse.length} cop${g.collapse.length === 1 ? "y" : "ies"}:
+          ${g.collapse.slice(0,3).map(m => esc(m.folder_path || "(root)")).join(" · ")}</div>
+      </div>
+    </div>`).join("") || "<p class='h-sub'>No within-source duplicates. 🎉</p>";
+}
+
+async function loadDeck() {
+  const data = await (await fetch("/api/rediscover")).json();
+  $("#deck").innerHTML = data.rows.map(r => `
+    <div class="card deckcard">
+      <span class="dom">${esc(r.domain)}</span>
+      <span class="dt"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a></span>
+      <span class="meta">Saved to ${esc(r.folder_path || "(root)")}</span>
+      <span><span class="topic">${esc(r.topic)}</span></span>
+    </div>`).join("");
+}
+
+$("#go").addEventListener("click", () => { libFilters.q = $("#q").value; loadLibrary(true); });
+$("#ask-go").addEventListener("click", askQuestion);
+$("#ask-q").addEventListener("keydown", e => { if (e.key === "Enter") askQuestion(); });
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") { libFilters.q = $("#q").value; loadLibrary(true); }});
+$("#f-status").addEventListener("change", () => { libFilters.status = $("#f-status").value; loadLibrary(true); });
+$("#more").addEventListener("click", () => loadLibrary(false));
+$("#shuffle").addEventListener("click", loadDeck);
+
+loadSummary(); loadLibrary(true); loadGraveyard(); loadDupes(); loadDeck();
+loadTopicTree(); loadDomains(); loadTopicMap();
+</script>
+</body>
+</html>

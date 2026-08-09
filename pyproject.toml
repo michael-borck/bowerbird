@@ -1,0 +1,52 @@
+[project]
+name = "bowerbird"
+version = "0.6.0"
+description = "Audit, clean, categorise and explore your browser bookmarks — link validation, LLM thematic analysis, Wayback recovery, and safe write-back"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Michael Borck", email = "michael.borck@curtin.edu.au" }]
+requires-python = ">=3.12"
+keywords = ["bookmarks", "browser", "brave", "chrome", "firefox", "link-rot",
+            "wayback", "obsidian", "claude", "curation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "httpx>=0.27",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "anthropic>=0.90",
+]
+
+[project.urls]
+Homepage = "https://github.com/michael-borck/bowerbird"
+
+[project.scripts]
+bowerbird = "bowerbird.cli:main"
+bower = "bowerbird.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = ["**/._*", "**/.DS_Store"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["bowerbird", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["bowerbird"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

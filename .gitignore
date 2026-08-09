@@ -1,0 +1,17 @@
+# Personal data — must never be committed or packaged
+bower.db*
+bowerbird.db*
+backups/
+exports/
+reports/
+
+# Build / env
+dist/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# macOS / exFAT junk
+.DS_Store
+._*

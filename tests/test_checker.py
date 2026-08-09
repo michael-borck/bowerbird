@@ -1,0 +1,75 @@
+import httpx
+
+from bowerbird.checker import classify_response, youtube_video_id
+
+
+def resp(status: int, url: str, requested: str | None = None) -> httpx.Response:
+    r = httpx.Response(status, request=httpx.Request("GET", requested or url))
+    # httpx derives .url from the request; simulate a redirect landing point
+    r._request = httpx.Request("GET", url)
+    return r
+
+
+def test_404_and_410_are_dead():
+    assert classify_response("https://e.com/a", resp(404, "https://e.com/a"), "")[0] == "dead"
+    assert classify_response("https://e.com/a", resp(410, "https://e.com/a"), "")[0] == "dead"
+
+
+def test_403_is_blocked_not_dead():
+    for code in (401, 403, 429, 451, 500, 503):
+        assert classify_response("https://e.com/a", resp(code, "https://e.com/a"), "")[0] == "blocked"
+
+
+def test_login_redirect_is_login_wall():
+    status, _ = classify_response(
+        "https://e.com/private/doc",
+        resp(200, "https://e.com/login?next=/private/doc", "https://e.com/private/doc"),
+        "<html><title>Please sign in</title></html>")
+    assert status == "login_wall"
+
+
+def test_auth_host_is_login_wall():
+    status, _ = classify_response(
+        "https://docs.corp.com/x",
+        resp(200, "https://accounts.google.com/o/saml", "https://docs.corp.com/x"),
+        "")
+    assert status == "login_wall"
+
+
+def test_password_form_after_redirect_is_login_wall():
+    status, _ = classify_response(
+        "https://e.com/members/area",
+        resp(200, "https://e.com/welcome", "https://e.com/members/area"),
+        '<form><input type="password" name="p"></form>')
+    assert status == "login_wall"
+
+
+def test_soft_404_title_is_dead():
+    status, reason = classify_response(
+        "https://e.com/old-post", resp(200, "https://e.com/old-post"),
+        "<title>Page Not Found - Example</title>")
+    assert status == "dead"
+    assert "soft-404" in reason
+
+
+def test_deep_link_redirected_to_root_is_suspect():
+    status, _ = classify_response(
+        "https://e.com/blog/2009/deep/post",
+        resp(200, "https://e.com/", "https://e.com/blog/2009/deep/post"),
+        "<title>Example Home</title>")
+    assert status == "suspect"
+
+
+def test_plain_200_is_live():
+    status, _ = classify_response(
+        "https://e.com/a", resp(200, "https://e.com/a"), "<title>A fine page</title>")
+    assert status == "live"
+
+
+def test_youtube_video_id_forms():
+    assert youtube_video_id("https://youtu.be/abc123DEF45") == "abc123DEF45"
+    assert youtube_video_id("https://www.youtube.com/watch?v=abc123DEF45") == "abc123DEF45"
+    assert youtube_video_id("https://www.youtube.com/shorts/abc123DEF45") == "abc123DEF45"
+    assert youtube_video_id("https://www.youtube.com/embed/abc123DEF45") == "abc123DEF45"
+    assert youtube_video_id("https://www.youtube.com/@channel") is None
+    assert youtube_video_id("https://vimeo.com/12345") is None
