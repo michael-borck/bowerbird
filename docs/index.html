@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bowerbird — audit, curate and rediscover your bookmarks</title>
+<meta name="description" content="A local-first bookmark manager: link validation that doesn't lie, LLM thematic analysis, full-text search, Wayback recovery, and safe write-back to your browser.">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --hairline: #e1e0d9; --ring: rgba(11,11,11,0.10);
+    --accent: #2a78d6; --accent-soft: #cde2fb; --accent-deep: #1c5cab;
+    --good: #0ca30c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+      --muted: #898781; --hairline: #2c2c2a; --ring: rgba(255,255,255,0.10);
+      --accent: #3987e5; --accent-soft: #10315c; --accent-deep: #6da7ec;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 16px/1.6 "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  header { padding: 72px 0 56px; }
+  .mark { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+  .mark svg { flex: none; }
+  .mark .name { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -0.02em;
+       line-height: 1.15; margin: 0 0 18px; max-width: 21ch; text-wrap: balance; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 58ch; margin: 0 0 30px; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  .install {
+    display: inline-flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--ring); border-radius: 10px;
+    padding: 14px 20px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 15px;
+  }
+  .install .dollar { color: var(--muted); user-select: none; }
+  .links { margin-top: 18px; font-size: 14.5px; display: flex; gap: 22px; flex-wrap: wrap; }
+
+  section { padding: 8px 0 40px; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase;
+             color: var(--muted); font-weight: 600; margin: 0 0 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px;
+          padding: 18px 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 15.5px; font-weight: 650; }
+  .card p { margin: 0; font-size: 14px; color: var(--ink-2); }
+
+  .flow { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+  .step { flex: 1 1 150px; background: var(--surface); border: 1px solid var(--ring);
+          border-radius: 10px; padding: 14px 16px; }
+  .step .n { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+             color: var(--accent); font-weight: 600; }
+  .step h4 { margin: 4px 0 4px; font-size: 14.5px; }
+  .step p { margin: 0; font-size: 13px; color: var(--ink-2); }
+
+  .truth { border-left: 3px solid var(--accent); padding: 4px 0 4px 18px; margin: 0; }
+  .truth p { margin: 0 0 8px; color: var(--ink-2); font-size: 15.5px; }
+  .truth p:last-child { margin: 0; }
+  .truth strong { color: var(--ink); }
+
+  footer { border-top: 1px solid var(--hairline); padding: 28px 0 48px; margin-top: 24px;
+           font-size: 13.5px; color: var(--muted); display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark">
+      <svg width="44" height="44" viewBox="0 0 30 30" aria-hidden="true">
+        <circle cx="15" cy="15" r="14" fill="var(--accent-soft)"/>
+        <path d="M6 20 Q15 10 24 20" stroke="var(--accent)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <path d="M9 21.5 Q15 14.5 21 21.5" stroke="var(--accent)" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.55"/>
+        <circle cx="15" cy="12" r="2.4" fill="var(--accent)"/>
+      </svg>
+      <span class="name">Bowerbird</span>
+    </div>
+    <h1>You collected the bookmarks.<br><em>It builds the bower.</em></h1>
+    <p class="lede">The satin bowerbird gathers every blue thing it can find, then arranges the
+    collection obsessively. Bowerbird does the second half for your browser bookmarks:
+    it <strong>audits</strong> every link, <strong>categorises</strong> them by theme,
+    makes them <strong>searchable and askable</strong> — and then, carefully and reversibly,
+    <strong>cleans up your browser</strong>. All on your own machine.</p>
+    <div class="install"><span class="dollar">$</span>pip install bowerbird-bookmarks<span class="dollar">&nbsp;·&nbsp;</span>bowerbird serve</div>
+    <div class="links">
+      <a href="https://github.com/michael-borck/bowerbird">GitHub</a>
+      <a href="https://pypi.org/project/bowerbird-bookmarks/">PyPI</a>
+      <a href="https://github.com/michael-borck/bowerbird#readme">Documentation</a>
+    </div>
+  </header>
+
+  <section>
+    <p class="eyebrow">What it does</p>
+    <div class="grid">
+      <div class="card"><h3>Link checking that doesn't lie</h3>
+        <p>Only a 404/410 or confirmed soft-404 counts as dead. A bot-wall 403 is blocked, not dead. A login page counts as alive. YouTube is checked via oEmbed, because deleted videos still return 200.</p></div>
+      <div class="card"><h3>Thematic analysis</h3>
+        <p>Claude derives a taxonomy from your collection first, then files every bookmark under 1–3 topics with confidence. Categories are tags — one link can live in many places.</p></div>
+      <div class="card"><h3>Search &amp; Ask</h3>
+        <p>Full-text search over titles, URLs and actual page text. Or ask a question and get links from your own collection, grouped by theme — never answers from the open web.</p></div>
+      <div class="card"><h3>Wayback recovery</h3>
+        <p>Dead links get Internet Archive snapshot lookup with per-row or bulk replacement. In practice ~70% of dead links are recoverable.</p></div>
+      <div class="card"><h3>Every browser, one bower</h3>
+        <p>Chrome, Brave, Edge, Vivaldi, Firefox and Safari ingest into one collection. The same link saved in two browsers is one URL — a fact, not a duplicate.</p></div>
+      <div class="card"><h3>Discovery</h3>
+        <p>A topic map of your collection's themes, a domain-triage view for efficient pruning, a daily rediscovery deck, and Obsidian export with wikilinked topic notes.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">How a cleanup flows</p>
+    <div class="flow">
+      <div class="step"><span class="n">01</span><h4>Ingest</h4><p>Read every browser's bookmarks. Strictly read-only.</p></div>
+      <div class="step"><span class="n">02</span><h4>Check</h4><p>Validate every link with honest status categories.</p></div>
+      <div class="step"><span class="n">03</span><h4>Curate</h4><p>Review the graveyard, triage domains, replace with snapshots.</p></div>
+      <div class="step"><span class="n">04</span><h4>Write back</h4><p>Your browser gets the cleaned tree. Backup first, always.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Principles</p>
+    <div class="truth">
+      <p><strong>Nothing is deleted without you.</strong> Every removal is a reviewed decision, applied only at write-back, where retired links move to a <code>_Graveyard</code> folder rather than vanishing.</p>
+      <p><strong>Local-first.</strong> Your bookmarks, history and database never leave your machine. The dashboard binds to localhost; the only network calls are the ones you'd expect — checking your links, and the LLM calls you configure.</p>
+      <p><strong>Provenance on everything.</strong> Every category records whether it came from a model, a rule, your folders, or you — so better models can later redo only the machine's work.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>MIT · Michael Borck</span>
+    <a href="https://github.com/michael-borck/bowerbird">github.com/michael-borck/bowerbird</a>
+    <span>Beta — built and used in anger on a 9,600-bookmark collection.</span>
+  </footer>
+</div>
+</body>
+</html>
