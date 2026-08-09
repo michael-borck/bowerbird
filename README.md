@@ -5,7 +5,7 @@ Bowerbird audits, cleans, categorises and helps you rediscover your browser
 bookmarks, entirely on your own machine.
 
 ```
-pip install bowerbird
+pip install bowerbird-bookmarks
 bowerbird ingest  # read your browsers' bookmarks (read-only)
 bowerbird check   # validate every link
 bowerbird serve   # dashboard at http://127.0.0.1:8420
