@@ -21,6 +21,8 @@ def main() -> None:
 
     sub.add_parser("sources", help="detect and register browser bookmark stores")
 
+    sub.add_parser("sync", help="one-shot incremental update: ingest, check, enrich, categorise, index")
+
     p_ingest = sub.add_parser("ingest", help="import bookmarks from registered sources (read-only)")
     p_ingest.add_argument("--source-id", type=int, default=None, help="only this source")
     p_ingest.add_argument("--no-history", action="store_true", help="skip browser-history joins")
@@ -64,7 +66,26 @@ def main() -> None:
     args = parser.parse_args()
     conn = db.connect(args.db)
 
-    if args.cmd == "sources":
+    if args.cmd == "sync":
+        # Every stage is incremental: ingest reconciles by guid, check probes only
+        # unchecked URLs, enrich and categorise touch only what they haven't seen.
+        register(conn, detect())
+        for source in conn.execute("SELECT * FROM sources").fetchall():
+            stats = ingest_source(conn, source)
+            if source["kind"] == "chromium" and "error" not in stats:
+                stats |= ingest_chromium_history(conn, source)
+            print(json.dumps(stats))
+        print(json.dumps({"check": asyncio.run(run_check(conn))}))
+        from .enrich import run_enrich
+        print(json.dumps({"enrich": asyncio.run(run_enrich(conn))}))
+        try:
+            from .categorize import assign
+            print(json.dumps({"categorize": assign(conn)}))
+        except Exception as exc:  # no taxonomy yet, or no API credentials
+            print(json.dumps({"categorize": f"skipped: {exc}"}))
+        from .categorize import rebuild_index
+        print(json.dumps({"index": rebuild_index(conn)}))
+    elif args.cmd == "sources":
         found = detect()
         register(conn, found)
         for row in conn.execute("SELECT * FROM sources ORDER BY id"):

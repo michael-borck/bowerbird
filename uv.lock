@@ -53,8 +53,8 @@ wheels = [
 ]
 
 [[package]]
-name = "bowerbird"
-version = "0.6.0"
+name = "bowerbird-bookmarks"
+version = "0.6.1"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

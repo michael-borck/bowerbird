@@ -58,6 +58,7 @@ written by the explicit `bowerbird writeback --apply`, and backed up first.
 
 | Command | What it does |
 |---|---|
+| `bowerbird sync` | one-shot incremental update: ingest → check → enrich → categorise → index |
 | `bowerbird sources` | detect and register installed browsers |
 | `bowerbird ingest` | import bookmarks + history (read-only, reconciling) |
 | `bowerbird check` | validate links (`--recheck` to re-probe) |
