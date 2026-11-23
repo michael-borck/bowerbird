@@ -78,6 +78,9 @@ def create_app(db_path: Path | None = None) -> FastAPI:
         status_counts = {r["status"]: r["c"] for r in
                          conn.execute("SELECT status, COUNT(*) c FROM urls GROUP BY status")}
         checked_at = conn.execute("SELECT MAX(checked_at) m FROM urls").fetchone()["m"]
+        unreachable = conn.execute(
+            f"SELECT COUNT(*) c FROM urls WHERE {db.FAILED} AND status IN {db.UNREACHABLE}"
+        ).fetchone()["c"]
 
         visited = conn.execute(
             """SELECT COUNT(DISTINCT b.canonical_url) c FROM bookmarks b
@@ -113,6 +116,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
             "duplicates": duplicates,
             "status_counts": status_counts,
             "last_checked": checked_at,
+            "unreachable_confirmed": unreachable,
             "visited_recently": visited,
             "topics": sorted(topics.items(), key=lambda kv: -kv[1])[:14],
             "years": sorted(years.items()),
@@ -180,36 +184,38 @@ def create_app(db_path: Path | None = None) -> FastAPI:
 
     @app.get("/api/graveyard")
     def graveyard(limit: int = Query(100, le=1000), offset: int = 0) -> dict:
+        queue = f"({db.FAILED} OR status = 'suspect')"
+        gone = f"{db.FAILED} AND review IS NULL"
         rows = [dict(r) for r in conn.execute(
-            """SELECT u.id, u.check_url, u.status, u.http_status, u.reason, u.checked_at, u.review,
-                      u.wayback_url, u.wayback_at,
-                      (SELECT title FROM bookmarks b
-                       WHERE b.canonical_url=u.canonical_url AND b.removed=0 LIMIT 1) AS title,
-                      (SELECT folder_path FROM bookmarks b
-                       WHERE b.canonical_url=u.canonical_url AND b.removed=0 LIMIT 1) AS folder_path
-               FROM urls u
-               WHERE u.status IN ('dead','error','timeout','suspect') AND u.review IS NULL
-               ORDER BY CASE u.status WHEN 'dead' THEN 0 WHEN 'error' THEN 1
-                        WHEN 'timeout' THEN 2 ELSE 3 END, u.id
-               LIMIT ? OFFSET ?""", (limit, offset))]
+            f"""SELECT u.id, u.check_url, u.status, u.http_status, u.reason, u.checked_at, u.review,
+                       u.wayback_url, u.wayback_at,
+                       (SELECT title FROM bookmarks b
+                        WHERE b.canonical_url=u.canonical_url AND b.removed=0 LIMIT 1) AS title,
+                       (SELECT folder_path FROM bookmarks b
+                        WHERE b.canonical_url=u.canonical_url AND b.removed=0 LIMIT 1) AS folder_path
+                FROM urls u
+                WHERE {queue} AND u.review IS NULL
+                ORDER BY CASE u.status WHEN 'dead' THEN 0 WHEN 'error' THEN 1
+                         WHEN 'timeout' THEN 2 ELSE 3 END, u.id
+                LIMIT ? OFFSET ?""", (limit, offset))]
         for r in rows:
             r["topic"] = topic_of(r["folder_path"] or "")
         counts = {r["status"]: r["c"] for r in conn.execute(
-            """SELECT status, COUNT(*) c FROM urls
-               WHERE status IN ('dead','error','timeout','suspect') AND review IS NULL
-               GROUP BY status""")}
+            f"""SELECT status, COUNT(*) c FROM urls
+                WHERE {queue} AND review IS NULL GROUP BY status""")}
         reviewed = conn.execute(
             "SELECT COUNT(*) c FROM urls WHERE review IS NOT NULL").fetchone()["c"]
         snapshots = conn.execute(
-            """SELECT COUNT(*) c FROM urls
-               WHERE status IN ('dead','error','timeout') AND review IS NULL
-                 AND wayback_url IS NOT NULL""").fetchone()["c"]
+            f"SELECT COUNT(*) c FROM urls WHERE {gone} AND wayback_url IS NOT NULL").fetchone()["c"]
         no_snapshot = conn.execute(
-            """SELECT COUNT(*) c FROM urls
-               WHERE status IN ('dead','error','timeout') AND review IS NULL
-                 AND wayback_checked_at IS NOT NULL AND wayback_url IS NULL""").fetchone()["c"]
+            f"""SELECT COUNT(*) c FROM urls WHERE {gone}
+                AND wayback_checked_at IS NOT NULL AND wayback_url IS NULL""").fetchone()["c"]
+        pending = conn.execute(
+            f"""SELECT COUNT(*) c FROM urls WHERE status IN {db.UNREACHABLE}
+                AND consecutive_failures < ? AND review IS NULL""",
+            (db.CONFIRMED_FAILURES,)).fetchone()["c"]
         return {"counts": counts, "reviewed": reviewed, "snapshots": snapshots,
-                "no_snapshot": no_snapshot, "rows": rows}
+                "no_snapshot": no_snapshot, "pending": pending, "rows": rows}
 
     @app.get("/api/duplicates")
     def duplicates(limit: int = Query(50, le=500), offset: int = 0) -> dict:
@@ -284,7 +290,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
     def domains(limit: int = Query(150, le=500)) -> dict:
         by: dict[str, dict] = {}
         for r in conn.execute(
-            """SELECT u.id, u.check_url, u.status, u.review,
+            """SELECT u.id, u.check_url, u.status, u.review, u.consecutive_failures,
                       (SELECT title FROM bookmarks b WHERE b.canonical_url=u.canonical_url
                        AND b.removed=0 LIMIT 1) AS title,
                       (SELECT MAX(h.last_visit) FROM history h
@@ -295,7 +301,8 @@ def create_app(db_path: Path | None = None) -> FastAPI:
                                      "reviewed": 0, "visited": 0, "samples": []})
             d["total"] += 1
             d["alive"] += r["status"] in ("live", "login_wall")
-            d["dead"] += r["status"] in ("dead", "error", "timeout")
+            d["dead"] += r["status"] == "dead" or (
+                r["status"] in ("error", "timeout") and r["consecutive_failures"] >= db.CONFIRMED_FAILURES)
             d["reviewed"] += r["review"] is not None
             d["visited"] += r["last_visit"] is not None
             if len(d["samples"]) < 3 and r["title"]:
@@ -414,16 +421,15 @@ def create_app(db_path: Path | None = None) -> FastAPI:
     @app.post("/api/graveyard/bulk")
     def graveyard_bulk(body: Bulk) -> dict:
         now = datetime.now(timezone.utc).isoformat()
+        gone = f"{db.FAILED} AND review IS NULL"
         if body.scope == "replace_snapshots":
             cur = conn.execute(
-                """UPDATE urls SET review='replace', reviewed_at=?
-                   WHERE status IN ('dead','error','timeout') AND review IS NULL
-                     AND wayback_url IS NOT NULL""", (now,))
+                f"""UPDATE urls SET review='replace', reviewed_at=?
+                    WHERE {gone} AND wayback_url IS NOT NULL""", (now,))
         elif body.scope == "let_go_no_snapshot":
             cur = conn.execute(
-                """UPDATE urls SET review='let_go', reviewed_at=?
-                   WHERE status IN ('dead','error','timeout') AND review IS NULL
-                     AND wayback_checked_at IS NOT NULL AND wayback_url IS NULL""", (now,))
+                f"""UPDATE urls SET review='let_go', reviewed_at=?
+                    WHERE {gone} AND wayback_checked_at IS NOT NULL AND wayback_url IS NULL""", (now,))
         else:
             raise HTTPException(400, "unknown scope")
         conn.commit()

@@ -19,7 +19,8 @@ bowerbird serve   # dashboard at http://127.0.0.1:8420
 - **Link validation** that doesn't lie: only 404/410 (or a confirmed soft-404)
   counts as *dead*; a bot-wall 403 is *blocked, not dead*; reaching a login page
   counts as *alive*; YouTube videos are checked via oEmbed because deleted
-  videos still return 200.
+  videos still return 200. A link that cannot be reached at all only joins the
+  graveyard after failing twice, on checks hours apart.
 - **Canonicalisation and duplicate detection** (tracking params stripped,
   youtu.be unified, per-source dupe groups with a keeper heuristic).
 - **LLM thematic analysis** (Claude, two-pass): a taxonomy is derived from your

@@ -1,5 +1,9 @@
-import httpx
+import asyncio
 
+import httpx
+import pytest
+
+import bowerbird.checker as checker
 from bowerbird.checker import classify_response, youtube_video_id
 
 
@@ -89,3 +93,24 @@ def test_youtube_video_id_forms():
     assert youtube_video_id("https://www.youtube.com/embed/abc123DEF45") == "abc123DEF45"
     assert youtube_video_id("https://www.youtube.com/@channel") is None
     assert youtube_video_id("https://vimeo.com/12345") is None
+
+
+def oembed_check(monkeypatch, status):
+    """check_one() for a YouTube bookmark, with oEmbed answering `status`."""
+    monkeypatch.setattr(checker, "RETRY_DELAY", 0)
+    transport = httpx.MockTransport(lambda request: httpx.Response(status, request=request))
+
+    async def run():
+        async with httpx.AsyncClient(transport=transport, follow_redirects=True) as client:
+            return await checker.check_one(client, checker.HostPacer(), "https://youtu.be/abc123DEF45")
+
+    return asyncio.run(run())["status"]
+
+
+@pytest.mark.parametrize("status", [429, 500, 503])
+def test_youtube_rate_limited_or_failing_is_blocked_not_dead(monkeypatch, status):
+    assert oembed_check(monkeypatch, status) == "blocked"
+
+
+def test_youtube_gone_is_still_dead(monkeypatch):
+    assert oembed_check(monkeypatch, 404) == "dead"

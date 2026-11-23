@@ -1,8 +1,10 @@
-"""Internet Archive snapshot lookup for dead/unreachable links.
+"""Internet Archive snapshot lookup for dead links.
 
-Uses the free Wayback availability API, one request per second (their polite
-rate). A found snapshot doesn't change any bookmark by itself — it enables the
-'replace' review decision, which write-back later applies.
+Uses the free Wayback availability API, one request every few seconds (their
+polite rate these days). Only links that are dead — or unreachable on two
+separate runs — are looked up. A found snapshot doesn't change any bookmark by
+itself — it enables the 'replace' review decision, which write-back later
+applies.
 """
 
 from __future__ import annotations
@@ -13,15 +15,17 @@ from datetime import datetime, timezone
 
 import httpx
 
+from .db import FAILED
+
 API = "https://archive.org/wayback/available"
-GONE = ("dead", "error", "timeout")
+REQUEST_INTERVAL = 4.0
 
 
 async def run_wayback(conn: sqlite3.Connection, limit: int | None = None,
                       progress_every: int = 50) -> dict:
     rows = conn.execute(
         f"""SELECT id, check_url FROM urls
-            WHERE status IN {GONE!r} AND wayback_checked_at IS NULL
+            WHERE {FAILED} AND wayback_checked_at IS NULL
               AND (review IS NULL OR review='replace') ORDER BY id"""
         + (f" LIMIT {int(limit)}" if limit else "")
     ).fetchall()
@@ -29,7 +33,6 @@ async def run_wayback(conn: sqlite3.Connection, limit: int | None = None,
         return {"checked": 0}
 
     found = done = throttled = 0
-    interval = 4.0  # archive.org throttles well below 1 req/s these days
     async with httpx.AsyncClient(timeout=20.0,
                                  headers={"User-Agent": "bower/0.1 (bookmark auditor; contact via github)"}) as client:
         for row in rows:
@@ -70,6 +73,6 @@ async def run_wayback(conn: sqlite3.Connection, limit: int | None = None,
                 done += 1
             if done and done % progress_every == 0:
                 print(f"  {done}/{len(rows)} answered, {found} snapshots, {throttled} throttles", flush=True)
-            await asyncio.sleep(interval)
+            await asyncio.sleep(REQUEST_INTERVAL)
 
     return {"checked": done, "snapshots_found": found, "throttled_responses": throttled}

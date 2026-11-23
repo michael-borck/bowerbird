@@ -8,8 +8,11 @@ Policy (learned from cite-sight, extended for bookmarks):
    - A soft-404 needs the error in the page <title>. The same words in page
      text or script (release notes, nav links, bundled 404 components) are
      ordinary content.
-  - YouTube videos are checked via the oEmbed API — the watch page itself
-    returns 200 even for deleted videos.
+   - YouTube videos are checked via the oEmbed API — the watch page itself
+     returns 200 even for deleted videos.
+   - An unreachable link (DNS failure, timeout) may just be a bad hour at one
+     end or the other: it is probed again on later runs and only joins the
+     graveyard once it has failed twice.
   - Per-host pacing + bounded global concurrency; one retry on 429/5xx/timeout.
 """
 
@@ -19,7 +22,7 @@ import asyncio
 import re
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, quote, urlsplit
 
 import httpx
@@ -37,6 +40,11 @@ HEADERS = {
 BODY_CAP = 65536
 DEFAULT_HOST_INTERVAL = 1.0
 HOST_INTERVALS = {"www.youtube.com": 0.3, "youtube.com": 0.3}
+RETRY_DELAY = 5.0
+# An unreachable link is probed again on later runs, so an outage heals by
+# itself — but not more often than this, or two checks in the same bad hour
+# would confirm each other.
+RECHECK_AFTER = timedelta(hours=6)
 
 AUTH_HOST_RE = re.compile(
     r"^(accounts\.google\.com|login\.microsoftonline\.com|login\.live\.com|"
@@ -132,11 +140,17 @@ async def check_one(client: httpx.AsyncClient, pacer: HostPacer, url: str) -> di
             async with client.stream("GET", probe, headers=HEADERS) as resp:
                 if vid:
                     await resp.aread()
-                    status, reason = {
-                        200: ("live", "oembed ok"),
-                        401: ("live", "oembed 401: exists, embedding disabled"),
-                        403: ("blocked", "oembed 403: private video"),
-                    }.get(resp.status_code, ("dead", f"oembed {resp.status_code}: video gone"))
+                    code = resp.status_code
+                    if code == 200:
+                        status, reason = "live", "oembed ok"
+                    elif code == 401:
+                        status, reason = "live", "oembed 401: exists, embedding disabled"
+                    elif code == 403:
+                        status, reason = "blocked", "oembed 403: private video"
+                    elif code == 429 or code >= 500:
+                        status, reason = "blocked", f"oembed {code}: refused us, not gone"
+                    else:
+                        status, reason = "dead", f"oembed {code}: video gone"
                 else:
                     body = b""
                     ctype = resp.headers.get("content-type", "")
@@ -155,7 +169,7 @@ async def check_one(client: httpx.AsyncClient, pacer: HostPacer, url: str) -> di
             status, reason, http_status, final = "error", f"{type(exc).__name__}: {exc}"[:200], None, None
 
         if attempt == 1 and (status == "timeout" or (http_status in (429,) or (http_status or 0) >= 500)):
-            await asyncio.sleep(5)
+            await asyncio.sleep(RETRY_DELAY)
             continue
         break
 
@@ -174,10 +188,17 @@ async def run_check(
     recheck: bool = False,
     progress_every: int = 100,
 ) -> dict:
-    where = "status <> 'skipped'" if recheck else "status = 'unchecked'"
+    if recheck:
+        where, params = "status <> 'skipped'", []
+    else:
+        # First probes, plus another go at unreachable links whose last probe is old enough.
+        cutoff = (datetime.now(timezone.utc) - RECHECK_AFTER).isoformat()
+        where = ("status = 'unchecked' OR (status IN ('error','timeout')"
+                 " AND COALESCE(checked_at, '') <= ?)")
+        params = [cutoff]
     rows = conn.execute(
         f"SELECT id, check_url FROM urls WHERE {where} ORDER BY id"
-        + (f" LIMIT {int(limit)}" if limit else "")
+        + (f" LIMIT {int(limit)}" if limit else ""), params
     ).fetchall()
     if not rows:
         return {"checked": 0}

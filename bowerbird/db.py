@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS urls (
     elapsed_ms INTEGER,
     checked_at TEXT,
     consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    enrich_attempts INTEGER NOT NULL DEFAULT 0,
     review TEXT,
     reviewed_at TEXT
 );
@@ -130,6 +131,15 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(
 #
 # `urls.review` decisions: keep | let_go | replace
 
+# A dead link is dead on sight. An unreachable one (DNS failure, timeout) may
+# just be a bad hour at either end, so it only counts as gone once it has
+# failed on two separate runs — see checker.RECHECK_AFTER. The graveyard, the
+# Wayback lookup and the bulk decisions all use this.
+CONFIRMED_FAILURES = 2
+UNREACHABLE = "('error', 'timeout')"
+FAILED = (f"(status = 'dead' OR (status IN {UNREACHABLE}"
+          f" AND consecutive_failures >= {CONFIRMED_FAILURES}))")
+
 
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
     return {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
@@ -175,6 +185,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE urls ADD COLUMN wayback_url TEXT")
         conn.execute("ALTER TABLE urls ADD COLUMN wayback_at TEXT")
         conn.execute("ALTER TABLE urls ADD COLUMN wayback_checked_at TEXT")
+
+    if "urls" in tables and "enrich_attempts" not in _columns(conn, "urls"):
+        conn.execute("ALTER TABLE urls ADD COLUMN enrich_attempts INTEGER NOT NULL DEFAULT 0")
+        # Enrichment used to record a failed fetch as done; give those another try.
+        conn.execute("""UPDATE urls SET enriched_at=NULL
+                        WHERE enriched_at IS NOT NULL AND page_title IS NULL
+                          AND page_description IS NULL AND page_text IS NULL""")
 
     conn.commit()
 

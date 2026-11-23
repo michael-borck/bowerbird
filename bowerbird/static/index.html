@@ -274,7 +274,7 @@
       <p class="h-sub" id="grave-sub"></p>
       <div class="facets" id="grave-bulk"></div>
       <div class="card" id="grave-rows"></div>
-      <p class="h-sub" style="margin-top:10px">“Replace” swaps the link for its Wayback snapshot, “Let go” retires it — both are recorded decisions applied at write-back, never silently. Run <code>bowerbird wayback</code> to look up snapshots, and <code>bowerbird writeback --source-id 1</code> for a dry-run of the changes.</p>
+      <p class="h-sub" style="margin-top:10px">“Replace” swaps the link for its Wayback snapshot, “Let go” retires it — both are recorded decisions applied at write-back, never silently. A link that could not be reached only shows up here once it has failed twice, on checks at least six hours apart. Run <code>bowerbird wayback</code> to look up snapshots, and <code>bowerbird writeback --source-id 1</code> for a dry-run of the changes.</p>
     </section>
 
     <section class="screen" id="duplicates">
@@ -335,7 +335,7 @@ function bars(el, entries, labelWidth) {
 async function loadSummary() {
   const s = await (await fetch("/api/summary")).json();
   const sc = s.status_counts, alive = (sc.live||0) + (sc.login_wall||0);
-  const unreachable = (sc.timeout||0) + (sc.error||0);
+  const unreachable = s.unreachable_confirmed || 0;
   const graveN = (sc.dead||0) + unreachable + (sc.suspect||0);
   const checked = Object.entries(sc).filter(([k]) => !["unchecked","skipped"].includes(k))
                         .reduce((a,[,v]) => a+v, 0);
@@ -420,7 +420,8 @@ async function loadGraveyard() {
   $("#grave-sub").textContent =
     `${fmt(c.dead||0)} confirmed dead · ${fmt((c.error||0)+(c.timeout||0))} unreachable · ` +
     `${fmt(c.suspect||0)} suspect · ${fmt(data.snapshots)} with a Wayback snapshot · ` +
-    `${fmt(data.reviewed)} reviewed so far`;
+    `${fmt(data.reviewed)} reviewed so far` +
+    (data.pending ? ` · ${fmt(data.pending)} unreachable links waiting on a second check` : "");
   $("#grave-bulk").innerHTML =
     (data.snapshots ? `<button class="btn sm primary" onclick="bulk('replace_snapshots')">Replace all with Wayback snapshots (${fmt(data.snapshots)})</button>` : "") +
     (data.no_snapshot ? `<button class="btn sm" onclick="bulk('let_go_no_snapshot')">Let go all without a snapshot (${fmt(data.no_snapshot)})</button>` : "");
