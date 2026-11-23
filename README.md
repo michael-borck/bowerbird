@@ -36,10 +36,10 @@ bowerbird serve   # dashboard at http://127.0.0.1:8420
 - **Obsidian export** — topic notes plus per-bookmark stubs with frontmatter
   and wikilinks; drop the folder into your vault.
 - **Topic map** — a force-directed graph of your collection's themes.
-- **Safe write-back** — regenerate the browser's bookmarks file: duplicates
-  collapsed, dead links moved to a `_Graveyard` folder (never silently
-  deleted), Wayback replacements applied. Dry-run by default, timestamped
-  backup always, refuses to run while the browser is open.
+- **Safe write-back** — regenerate the browser's bookmarks file: duplicate
+  copies and dead links moved to a `_Graveyard` folder (never deleted),
+  Wayback replacements applied. Dry-run by default, timestamped backup
+  always, refuses to run while the browser is open.
 
 ## Requirements
 

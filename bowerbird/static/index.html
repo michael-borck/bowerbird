@@ -281,7 +281,7 @@
       <h1>Duplicates</h1>
       <p class="h-sub" id="dupes-sub"></p>
       <div class="card" id="dupes-rows"></div>
-      <p class="h-sub" style="margin-top:10px">Duplicates are within one browser only — the same link saved in two browsers is intentional. The kept copy is the one filed most specifically; collapsing happens at write-back (Phase 4), nothing is removed yet.</p>
+      <p class="h-sub" style="margin-top:10px">Duplicates are within one browser only — the same link saved in two browsers is intentional. The kept copy is the one filed most specifically; at write-back the other copies move to <code>_Graveyard</code> alongside retired links, so nothing is deleted. Links that differ only by a <code>#anchor</code> are left alone.</p>
     </section>
 
     <section class="screen" id="rediscover">
@@ -353,7 +353,7 @@ async function loadSummary() {
     <div class="card tile"><div class="label">Bookmarks</div><div class="value">${fmt(s.total_bookmarks)}</div>
       <div class="note">${fmt(s.unique_urls)} unique after canonicalise</div></div>
     <div class="card tile"><div class="label">Duplicates</div><div class="value">${fmt(s.duplicates)}</div>
-      <div class="note">entries that collapse on write-back</div></div>
+      <div class="note">copies that move to _Graveyard on write-back</div></div>
     <div class="card tile"><div class="label">Dead links</div><div class="value">${fmt(sc.dead||0)}${pct(sc.dead||0)}</div>
       <div class="note">+${fmt(unreachable)} on unreachable hosts</div></div>
     <div class="card tile"><div class="label">Login-walled</div><div class="value">${fmt(sc.login_wall||0)}</div>
@@ -620,7 +620,7 @@ async function loadDupes() {
   const data = await (await fetch("/api/duplicates?limit=50")).json();
   $("#nav-dupes").textContent = fmt(data.total);
   $("#dupes-sub").textContent =
-    `${fmt(data.total)} duplicate groups · collapsing removes ${fmt(data.total_entries_removed)} bookmark entries · showing ${Math.min(50, data.total)}`;
+    `${fmt(data.total)} duplicate groups · collapsing moves ${fmt(data.total_entries_collapsed)} copies to _Graveyard · showing ${Math.min(50, data.total)}`;
   $("#dupes-rows").innerHTML = data.groups.map(g => `
     <div class="grave-row">
       <div>

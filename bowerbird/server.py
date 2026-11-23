@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from . import db
+from .duplicates import duplicate_groups
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -62,10 +63,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
         unique = conn.execute("SELECT COUNT(*) c FROM urls").fetchone()["c"]
         # Duplicates are within-source only: the same URL in two browsers is
         # intentional ("saved in 2 places"), not something to collapse.
-        duplicates = conn.execute(
-            """SELECT COALESCE(SUM(cnt - dst), 0) d FROM
-               (SELECT COUNT(*) cnt, COUNT(DISTINCT canonical_url) dst
-                FROM bookmarks WHERE removed=0 GROUP BY source_id)""").fetchone()["d"]
+        duplicates = sum(len(g["collapse"]) for g in duplicate_groups(conn))
         status_counts = {r["status"]: r["c"] for r in
                          conn.execute("SELECT status, COUNT(*) c FROM urls GROUP BY status")}
         checked_at = conn.execute("SELECT MAX(checked_at) m FROM urls").fetchone()["m"]
@@ -204,33 +202,10 @@ def create_app(db_path: Path | None = None) -> FastAPI:
 
     @app.get("/api/duplicates")
     def duplicates(limit: int = Query(50, le=500), offset: int = 0) -> dict:
-        groups: dict[tuple[int, str], list[dict]] = {}
-        for r in conn.execute(
-            """SELECT b.id, b.title, b.url, b.canonical_url, b.folder_path, b.source_id,
-                      s.browser, s.profile
-               FROM bookmarks b JOIN sources s ON s.id=b.source_id
-               WHERE b.removed=0 AND b.canonical_url IN (
-                   SELECT canonical_url FROM bookmarks WHERE removed=0
-                   GROUP BY source_id, canonical_url HAVING COUNT(*) > 1)
-               ORDER BY b.canonical_url, b.id"""):
-            groups.setdefault((r["source_id"], r["canonical_url"]), []).append(dict(r))
-
-        result = []
-        for (_, canonical), members in groups.items():
-            if len(members) < 2:
-                continue
-            # Keeper heuristic: the copy in the most specific folder, avoiding Read Later.
-            keeper = max(members, key=lambda m: (
-                "read later" not in m["folder_path"].lower(), len(m["folder_path"])))
-            result.append({
-                "canonical_url": canonical,
-                "browser": members[0]["browser"], "profile": members[0]["profile"],
-                "keep": keeper, "collapse": [m for m in members if m["id"] != keeper["id"]],
-            })
-        total = len(result)
-        return {"total": total,
-                "total_entries_removed": sum(len(g["collapse"]) for g in result),
-                "groups": result[offset:offset + limit]}
+        groups = duplicate_groups(conn)
+        return {"total": len(groups),
+                "total_entries_collapsed": sum(len(g["collapse"]) for g in groups),
+                "groups": groups[offset:offset + limit]}
 
     @app.get("/api/rediscover")
     def rediscover(count: int = 6) -> dict:
