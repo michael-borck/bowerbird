@@ -1,6 +1,6 @@
 [project]
 name = "bowerbird-bookmarks"
-version = "0.6.1"
+version = "0.7.0"
 description = "Audit, clean, categorise and explore your browser bookmarks — link validation, LLM thematic analysis, Wayback recovery, and safe write-back"
 readme = "README.md"
 license = { file = "LICENSE" }
