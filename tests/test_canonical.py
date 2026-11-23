@@ -51,3 +51,16 @@ def test_is_checkable():
     assert not is_checkable("http://localhost:3000")
     assert not is_checkable("http://192.168.1.10/admin")
     assert not is_checkable("file:///Users/me/doc.html")
+
+
+def test_urls_no_client_can_request_are_not_checkable():
+    for url in ["http://example.com/a\n", "http://example.com/\tx", "http://example.com:abc/",
+                "http://example.com:99999/", "http:///path"]:
+        assert not is_checkable(url), url
+
+
+def test_canonicalize_never_raises():
+    for url in ["http://example.com:abc/", "http://example.com:99999/", "http://[::1", "http://",
+                "http://exa mple.com/\x00", ""]:
+        assert isinstance(canonicalize(url), str), url
+    assert canonicalize("http://example.com:abc/") == "https://example.com/"

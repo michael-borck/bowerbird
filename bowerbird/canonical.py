@@ -3,6 +3,10 @@
 The canonical form unifies scheme to https, strips www./m., drops fragments,
 tracking parameters and trailing slashes, sorts the query, and folds YouTube's
 many URL shapes onto youtube.com/watch?v=ID.
+
+Neither function raises, whatever the bookmark looks like: they arrive from
+other people's exports and synced devices, and a malformed one is still a
+bookmark.
 """
 
 from __future__ import annotations
@@ -20,14 +24,26 @@ YOUTUBE_HOSTS = {"youtube.com", "m.youtube.com", "www.youtube.com", "music.youtu
 # Params that don't change which video you land on.
 YOUTUBE_DROP = {"feature", "ab_channel", "pp", "index", "app", "sns", "annotation_id", "src_vid"}
 
+_UNUSABLE = object()
+
+
+def _port(parts):
+    """The port, or _UNUSABLE when the text is not one a client could use."""
+    try:
+        return parts.port
+    except ValueError:  # "http://host:abc/"
+        return _UNUSABLE
+
 
 def is_checkable(url: str) -> bool:
-    """http(s) URLs pointing at a public host."""
+    """http(s) URLs pointing at a public host that a client can actually request."""
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in url):
+        return False
     try:
         parts = urlsplit(url)
     except ValueError:
         return False
-    if parts.scheme not in ("http", "https"):
+    if parts.scheme not in ("http", "https") or _port(parts) is _UNUSABLE:
         return False
     host = (parts.hostname or "").lower()
     if not host or host == "localhost" or host.endswith(".local"):
@@ -64,7 +80,9 @@ def canonicalize(url: str) -> str:
     if host.startswith("www."):
         host = host[4:]
 
-    port = parts.port
+    port = _port(parts)
+    if port is _UNUSABLE:
+        port = None  # still a bookmark, so still a key
     netloc = host if port in (None, 80, 443) else f"{host}:{port}"
 
     if path != "/" and path.endswith("/"):

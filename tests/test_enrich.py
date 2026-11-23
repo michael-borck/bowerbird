@@ -110,3 +110,25 @@ def test_databases_from_before_keep_trying_their_failed_fetches(tmp_path):
     conn = db.connect(path)                     # and only the once
     assert conn.execute("SELECT COUNT(*) FROM urls WHERE enriched_at IS NOT NULL").fetchone()[0] == 2
     conn.close()
+
+
+def test_an_unrequestable_url_is_settled_with_nothing(conn, serve):
+    conn.execute("INSERT INTO urls(id, canonical_url, check_url, status) "
+                 "VALUES(6,'https://odd.example/a','http://odd.example/a\n','live')")
+    conn.commit()
+    serve(lambda request: httpx.Response(200, text="<title>T</title>",
+                                         headers={"content-type": "text/html"}, request=request))
+
+    asyncio.run(enrich.run_enrich(conn))
+
+    assert state(conn)[6] == (True, 0, None)
+
+
+def test_an_unexpected_error_on_one_url_is_counted_not_fatal(conn, serve):
+    def bug(request):
+        raise RuntimeError("simulated bug")
+
+    serve(bug)
+
+    assert asyncio.run(enrich.run_enrich(conn)) == {"enriched": 0, "with_metadata": 0, "failed": 4}
+    assert [state(conn)[i][1] for i in (1, 2, 3, 4)] == [1, 1, 1, 1]

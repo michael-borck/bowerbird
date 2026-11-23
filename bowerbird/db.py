@@ -127,7 +127,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(
 #   suspect    2xx but smells wrong (deep link redirected to the site root)
 #   timeout    request timed out
 #   error      DNS/TLS/connection failure
-#   skipped    non-http(s) scheme or private/loopback host
+#   skipped    non-http(s) scheme, private/loopback host, or a URL no client can request
 #
 # `urls.review` decisions: keep | let_go | replace
 

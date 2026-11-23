@@ -13,6 +13,8 @@ Policy (learned from cite-sight, extended for bookmarks):
    - An unreachable link (DNS failure, timeout) may just be a bad hour at one
      end or the other: it is probed again on later runs and only joins the
      graveyard once it has failed twice.
+   - A URL no client can request is skipped; an unexpected error on one URL is
+     recorded against that URL instead of ending the run.
   - Per-host pacing + bounded global concurrency; one retry on 429/5xx/timeout.
 """
 
@@ -167,6 +169,10 @@ async def check_one(client: httpx.AsyncClient, pacer: HostPacer, url: str) -> di
             status, reason, http_status, final = "timeout", "timed out", None, None
         except httpx.HTTPError as exc:
             status, reason, http_status, final = "error", f"{type(exc).__name__}: {exc}"[:200], None, None
+        except (httpx.InvalidURL, ValueError) as exc:
+            # No client can ever request this URL, so there is nothing to retry next run.
+            status, reason = "skipped", f"malformed URL ({exc})"[:200]
+            http_status = final = None
 
         if attempt == 1 and (status == "timeout" or (http_status in (429,) or (http_status or 0) >= 500)):
             await asyncio.sleep(RETRY_DELAY)
@@ -215,7 +221,11 @@ async def run_check(
 
         async def worker(row: sqlite3.Row) -> tuple[int, dict]:
             async with sem:
-                return row["id"], await check_one(client, pacer, row["check_url"])
+                try:
+                    return row["id"], await check_one(client, pacer, row["check_url"])
+                except Exception as exc:  # one bad row must not cost us the whole run
+                    return row["id"], {"status": "error", "reason": f"{type(exc).__name__}: {exc}"[:200],
+                                       "http_status": None, "final_url": None, "elapsed_ms": None}
 
         for coro in asyncio.as_completed([worker(r) for r in rows]):
             url_id, result = await coro

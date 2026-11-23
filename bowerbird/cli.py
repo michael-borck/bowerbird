@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sqlite3
 from pathlib import Path
 
 from . import db
@@ -12,6 +13,26 @@ from .checker import run_check
 from .ingest import ingest_chromium_history, ingest_source
 from .report import build_report
 from .sources import detect, register
+
+
+def ingest_all(conn: sqlite3.Connection, source_id: int | None = None, history: bool = True) -> None:
+    """Ingest the registered sources (or one of them), one line of JSON each.
+
+    A store that cannot be read is one failed line, not a lost run: whatever it
+    had written so far is rolled back and the next source carries on.
+    """
+    rows = conn.execute(
+        "SELECT * FROM sources" + (f" WHERE id={int(source_id)}" if source_id else "")).fetchall()
+    for source in rows:
+        try:
+            stats = ingest_source(conn, source)
+            if source["kind"] == "chromium" and history and "error" not in stats:
+                stats |= ingest_chromium_history(conn, source)
+        except Exception as exc:
+            conn.rollback()
+            stats = {"source": f"{source['browser']}/{source['profile']}",
+                     "error": f"{type(exc).__name__}: {exc}"[:200]}
+        print(json.dumps(stats))
 
 
 def main() -> None:
@@ -70,11 +91,7 @@ def main() -> None:
         # Every stage is incremental: ingest reconciles by guid, check probes only
         # unchecked URLs, enrich and categorise touch only what they haven't seen.
         register(conn, detect())
-        for source in conn.execute("SELECT * FROM sources").fetchall():
-            stats = ingest_source(conn, source)
-            if source["kind"] == "chromium" and "error" not in stats:
-                stats |= ingest_chromium_history(conn, source)
-            print(json.dumps(stats))
+        ingest_all(conn)
         print(json.dumps({"check": asyncio.run(run_check(conn))}))
         from .enrich import run_enrich
         print(json.dumps({"enrich": asyncio.run(run_enrich(conn))}))
@@ -92,14 +109,7 @@ def main() -> None:
             print(f"  [{row['id']}] {row['browser']:<9} {row['profile']:<20} ({row['kind']})  {row['path']}")
     elif args.cmd == "ingest":
         register(conn, detect())
-        rows = conn.execute(
-            "SELECT * FROM sources" + (f" WHERE id={int(args.source_id)}" if args.source_id else "")
-        ).fetchall()
-        for source in rows:
-            stats = ingest_source(conn, source)
-            if source["kind"] == "chromium" and not args.no_history and "error" not in stats:
-                stats |= ingest_chromium_history(conn, source)
-            print(json.dumps(stats))
+        ingest_all(conn, args.source_id, history=not args.no_history)
     elif args.cmd == "check":
         stats = asyncio.run(run_check(conn, limit=args.limit,
                                       concurrency=args.concurrency, recheck=args.recheck))

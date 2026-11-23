@@ -26,13 +26,18 @@ _MAC_EPOCH = datetime(2001, 1, 1, tzinfo=timezone.utc)
 def chrome_ts_to_iso(value: str | int | None) -> str | None:
     try:
         us = int(value or 0)
-    except (TypeError, ValueError):
+        return (_CHROME_EPOCH + timedelta(microseconds=us)).isoformat() if us > 0 else None
+    except (TypeError, ValueError, OverflowError, OSError):
         return None
-    return (_CHROME_EPOCH + timedelta(microseconds=us)).isoformat() if us > 0 else None
 
 
 def unix_us_to_iso(us: int | None) -> str | None:
-    return (_UNIX_EPOCH + timedelta(microseconds=us)).isoformat() if us else None
+    if not us:
+        return None
+    try:
+        return (_UNIX_EPOCH + timedelta(microseconds=us)).isoformat()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
 
 
 # ---------- parsers: each yields dicts with guid/title/url/folder_path/root/dates ----------

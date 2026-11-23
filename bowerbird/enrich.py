@@ -85,8 +85,12 @@ async def run_enrich(conn: sqlite3.Connection, limit: int | None = None,
                             _unescape(title_m.group(1))[:300] if title_m else None,
                             _unescape(desc_m.group(1))[:500] if desc_m else None,
                             visible_text(text) or None, True)
+                except (httpx.InvalidURL, ValueError):
+                    return row["id"], None, None, None, True   # no client can ever request this URL
                 except httpx.HTTPError:
                     return row["id"], None, None, None, False
+                except Exception:
+                    return row["id"], None, None, None, False   # one bad row must not cost us the whole run
 
         for coro in asyncio.as_completed([fetch(r) for r in rows]):
             url_id, title, desc, page_text, fetched = await coro

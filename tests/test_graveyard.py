@@ -143,3 +143,30 @@ def test_wayback_looks_up_only_confirmed_failures(conn, monkeypatch):
     assert asyncio.run(wayback.run_wayback(conn)) == {
         "checked": 2, "snapshots_found": 0, "throttled_responses": 0}
     assert sorted(asked) == ["https://e.com/dead", "https://e.com/twice"]
+
+
+def test_one_unrequestable_url_does_not_cost_the_run(conn, probed):
+    add_url(conn, "https://new.example/a")
+    add_url(conn, "http://new.example/b\n")
+    add_url(conn, "https://new.example/c")
+
+    asyncio.run(checker.run_check(conn))
+
+    assert state(conn) == {"https://new.example/a": ("live", 0),
+                           "http://new.example/b\n": ("skipped", 0),
+                           "https://new.example/c": ("live", 0)}
+    assert len(probed) == 2
+
+
+def test_an_unexpected_error_on_one_url_is_recorded_not_fatal(conn, monkeypatch):
+    real = httpx.AsyncClient
+
+    def bug(request):
+        raise RuntimeError("simulated bug")
+
+    monkeypatch.setattr(checker.httpx, "AsyncClient",
+                        lambda **kw: real(transport=httpx.MockTransport(bug), **kw))
+    add_url(conn, "https://new.example/a")
+    add_url(conn, "https://other.example/b")
+
+    assert asyncio.run(checker.run_check(conn)) == {"checked": 2, "error": 2}

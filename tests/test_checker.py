@@ -114,3 +114,17 @@ def test_youtube_rate_limited_or_failing_is_blocked_not_dead(monkeypatch, status
 
 def test_youtube_gone_is_still_dead(monkeypatch):
     assert oembed_check(monkeypatch, 404) == "dead"
+
+
+@pytest.mark.parametrize("url", ["http://h.example/a\n", "http://h.example/\tx",
+                                 "http://h.example:80:80/", "http://:80/"])
+def test_urls_no_client_can_request_are_skipped(monkeypatch, url):
+    monkeypatch.setattr(checker, "RETRY_DELAY", 0)
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, request=request))
+
+    async def run():
+        async with httpx.AsyncClient(transport=transport, follow_redirects=True) as client:
+            return await checker.check_one(client, checker.HostPacer(), url)
+
+    result = asyncio.run(run())
+    assert result["status"] == "skipped" and "malformed URL" in result["reason"]
