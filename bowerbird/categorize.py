@@ -8,7 +8,9 @@ failure mode ("Finance" vs "Finances") that grows batch by batch.
 Pass B (`assign`): batches of bookmarks are matched against that fixed taxonomy
 with structured outputs. Assignments record their source and model so a better
 model can later redo only machine-made labels. Manual assignments are never
-overwritten.
+overwritten. A URL the model has already judged is not sent again, whether or
+not it found a category for it; only a batch the provider failed to answer is
+retried.
 """
 
 from __future__ import annotations
@@ -146,8 +148,7 @@ def assign(conn: sqlite3.Connection, model: str | None = None,
                   (SELECT folder_path FROM bookmarks b WHERE b.canonical_url=u.canonical_url
                    AND b.removed=0 LIMIT 1) AS folder_path
            FROM urls u
-           WHERE u.status NOT IN ('skipped')
-             AND NOT EXISTS (SELECT 1 FROM url_categories c WHERE c.url_id=u.id)
+           WHERE u.status NOT IN ('skipped') AND u.categorized_at IS NULL
            ORDER BY u.id"""
         + (f" LIMIT {int(limit)}" if limit else "")
     ).fetchall()
@@ -179,8 +180,11 @@ def assign(conn: sqlite3.Connection, model: str | None = None,
             print(f"  batch at {start} failed: {exc}", flush=True)
             skipped += len(batch)
             continue
+        # Answered is answered, whether or not the model found a place for each one.
+        conn.executemany("UPDATE urls SET categorized_at=? WHERE id=?", [(now, r["id"]) for r in batch])
         if data is None:
             skipped += len(batch)
+            conn.commit()
             continue
 
         for item in data.get("items", []):

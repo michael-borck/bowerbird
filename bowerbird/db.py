@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS urls (
     checked_at TEXT,
     consecutive_failures INTEGER NOT NULL DEFAULT 0,
     enrich_attempts INTEGER NOT NULL DEFAULT 0,
+    categorized_at TEXT,
     review TEXT,
     reviewed_at TEXT
 );
@@ -192,6 +193,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("""UPDATE urls SET enriched_at=NULL
                         WHERE enriched_at IS NOT NULL AND page_title IS NULL
                           AND page_description IS NULL AND page_text IS NULL""")
+
+    if "urls" in tables and "categorized_at" not in _columns(conn, "urls"):
+        conn.execute("ALTER TABLE urls ADD COLUMN categorized_at TEXT")
+        # Anything already carrying a category has of course been seen by the model.
+        conn.execute("""UPDATE urls SET categorized_at =
+                        (SELECT MAX(assigned_at) FROM url_categories WHERE url_id = urls.id)
+                        WHERE EXISTS (SELECT 1 FROM url_categories WHERE url_id = urls.id)""")
 
     conn.commit()
 

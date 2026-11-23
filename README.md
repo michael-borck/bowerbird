@@ -25,7 +25,8 @@ bowerbird serve   # dashboard at http://127.0.0.1:8420
   youtu.be unified, per-source dupe groups with a keeper heuristic).
 - **LLM thematic analysis** (Claude, two-pass): a taxonomy is derived from your
   collection first, then bookmarks are assigned 1–3 categories with confidence.
-  Categories are tags — one bookmark can live in many.
+  Categories are tags — one bookmark can live in many. Each bookmark goes to
+  the model once; later syncs only send what is new.
 - **Full-text search** (SQLite FTS5) over titles, URLs, topics, and the visible
   text of every reachable page.
 - **Ask your bookmarks** — ask a question, get *links from your own collection*
