@@ -54,6 +54,15 @@ Everything lives in `$BOWERBIRD_HOME` (default `~/.bowerbird`): the SQLite datab
 write-back backups, reports and exports. A `bowerbird.db` in the current directory is respected. Your browsers' own files are only ever
 written by the explicit `bowerbird writeback --apply`, and backed up first.
 
+## Configuration
+
+- `~/.bowerbird/profile.md` — a sentence or two about you and what you
+  collect. Categorisation and Ask use it to make sense of your collection.
+  Without it, bowerbird describes the collection from your folder names and
+  most-saved hosts.
+- Model IDs: `BOWERBIRD_TAXONOMY_MODEL` (taxonomy, and Ask unless overridden),
+  `BOWERBIRD_ASSIGN_MODEL` (assignment), `BOWERBIRD_CHAT_MODEL` (Ask alone).
+
 ## Commands
 
 | Command | What it does |

@@ -15,6 +15,8 @@ from pydantic import BaseModel
 
 from . import db
 from .duplicates import duplicate_groups
+from .models import chat_model
+from .profile import NOISE, describe_collection
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -34,12 +36,6 @@ class DomainReview(BaseModel):
 
 class ChatQ(BaseModel):
     question: str
-
-
-# Folder-path tokens that are containers, not topics.
-NOISE = {"Bookmarks bar", "Other bookmarks", "Mobile bookmarks", "Imported From Firefox",
-         "unfiled", "Imported", "menu", "toolbar", "BookmarksBar", "BookmarksMenu",
-         "com.apple.ReadingList", ""}
 
 
 def topic_of(folder_path: str) -> str:
@@ -314,6 +310,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
     def chat(body: ChatQ) -> dict:
         import anthropic
         client = anthropic.Anthropic()
+        description, _ = describe_collection(conn)
 
         def fts(query: str, limit: int = 15) -> list[int]:
             fts_query = " OR ".join('"' + t.replace('"', "") + '"' for t in query.split() if t)
@@ -325,16 +322,15 @@ def create_app(db_path: Path | None = None) -> FastAPI:
                 return []
 
         expand = client.messages.create(
-            model="claude-opus-5", max_tokens=1500,
+            model=chat_model(), max_tokens=1500,
             output_config={"effort": "low", "format": {"type": "json_schema", "schema": {
                 "type": "object",
                 "properties": {"queries": {"type": "array", "items": {"type": "string"}}},
                 "required": ["queries"], "additionalProperties": False}}},
             messages=[{"role": "user", "content":
                        "Produce 3-6 short full-text search queries (2-4 words each) that would find "
-                       "pages relevant to this question in a personal bookmark collection about "
-                       "computing, teaching, research, 3D printing and hobbies. Question: "
-                       + body.question[:500]}])
+                       "pages relevant to this question in a personal bookmark collection. "
+                       + description + " Question: " + body.question[:500]}])
         if expand.stop_reason == "refusal":
             raise HTTPException(502, "the model declined the question")
         queries = json.loads(next(b.text for b in expand.content if b.type == "text"))["queries"]
@@ -363,7 +359,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
             f"{(c['topics'] or '')[:80]} | {(c['page_description'] or '')[:150]}"
             for i, c in enumerate(candidates))
         select = client.messages.create(
-            model="claude-opus-5", max_tokens=4000,
+            model=chat_model(), max_tokens=4000,
             output_config={"effort": "low", "format": {"type": "json_schema", "schema": {
                 "type": "object",
                 "properties": {

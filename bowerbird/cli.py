@@ -116,11 +116,11 @@ def main() -> None:
         print(json.dumps(asyncio.run(run_enrich(conn, limit=args.limit,
                                                 concurrency=args.concurrency))))
     elif args.cmd == "categorize":
-        from .categorize import ASSIGN_MODEL, assign, derive_taxonomy
+        from .categorize import assign, derive_taxonomy
         if args.taxonomy:
             print(json.dumps(derive_taxonomy(conn)))
         if args.assign or not args.taxonomy:
-            print(json.dumps(assign(conn, model=args.model or ASSIGN_MODEL, limit=args.limit)))
+            print(json.dumps(assign(conn, model=args.model, limit=args.limit)))
     elif args.cmd == "index":
         from .categorize import rebuild_index
         print(json.dumps(rebuild_index(conn)))

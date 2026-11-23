@@ -14,16 +14,15 @@ overwritten.
 from __future__ import annotations
 
 import json
-import random
 import sqlite3
-from collections import Counter
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 import anthropic
 
-TAXONOMY_MODEL = "claude-opus-5"
-ASSIGN_MODEL = "claude-haiku-4-5"
+from .models import assign_model, taxonomy_model
+from .profile import describe_collection, top_folders
+
 BATCH_SIZE = 25
 
 TAXONOMY_SCHEMA = {
@@ -78,16 +77,6 @@ ASSIGN_SCHEMA = {
 }
 
 
-def _folder_counts(conn: sqlite3.Connection) -> Counter:
-    counts: Counter = Counter()
-    for row in conn.execute("SELECT folder_path FROM bookmarks WHERE removed=0"):
-        for part in row["folder_path"].split("/"):
-            if part and part not in ("Bookmarks bar", "Other bookmarks", "Imported From Firefox",
-                                     "unfiled", "menu", "toolbar", "Imported"):
-                counts[part] += 1
-    return counts
-
-
 def _sample_items(conn: sqlite3.Connection, n: int = 300) -> list[str]:
     rows = conn.execute(
         """SELECT b.title, b.url, b.folder_path FROM bookmarks b
@@ -97,9 +86,11 @@ def _sample_items(conn: sqlite3.Connection, n: int = 300) -> list[str]:
             for r in rows]
 
 
-def derive_taxonomy(conn: sqlite3.Connection, model: str = TAXONOMY_MODEL) -> dict:
+def derive_taxonomy(conn: sqlite3.Connection, model: str | None = None) -> dict:
+    model = taxonomy_model(model)
     client = anthropic.Anthropic()
-    folders = "\n".join(f"{name}: {count}" for name, count in _folder_counts(conn).most_common(80))
+    description, source = describe_collection(conn)
+    folders = "\n".join(f"{name}: {count}" for name, count in top_folders(conn).most_common(80))
     sample = "\n".join(_sample_items(conn))
 
     response = client.messages.create(
@@ -110,9 +101,8 @@ def derive_taxonomy(conn: sqlite3.Connection, model: str = TAXONOMY_MODEL) -> di
         messages=[{
             "role": "user",
             "content": (
-                "Design a category taxonomy for a personal bookmark collection of ~8,500 links "
-                "belonging to an academic who teaches computing, does research, 3D prints, and has "
-                "many hobbies. Requirements:\n"
+                "Design a category taxonomy for a personal bookmark collection. "
+                f"{description} Requirements:\n"
                 "- 12-20 top-level categories, each with 0-8 children (two levels max).\n"
                 "- Merge synonyms and near-duplicates into one canonical name.\n"
                 "- Names are short (1-3 words). No 'Miscellaneous'/'Other' categories.\n"
@@ -134,7 +124,8 @@ def derive_taxonomy(conn: sqlite3.Connection, model: str = TAXONOMY_MODEL) -> di
     for path in paths:
         conn.execute("INSERT OR IGNORE INTO categories(path, source) VALUES(?, 'llm')", (path,))
     conn.commit()
-    return {"top_level": len(data["categories"]), "total_paths": len(paths)}
+    return {"top_level": len(data["categories"]), "total_paths": len(paths),
+            "model": model, "profile": source}
 
 
 def _system_prompt(conn: sqlite3.Connection) -> list[dict]:
@@ -156,8 +147,9 @@ def _system_prompt(conn: sqlite3.Connection) -> list[dict]:
     }]
 
 
-def assign(conn: sqlite3.Connection, model: str = ASSIGN_MODEL,
+def assign(conn: sqlite3.Connection, model: str | None = None,
            limit: int | None = None, progress_every: int = 10) -> dict:
+    model = assign_model(model)
     client = anthropic.Anthropic()
     valid_paths = {r["path"] for r in conn.execute("SELECT path FROM categories")}
     if not valid_paths:
