@@ -9,9 +9,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import db
 from .duplicates import duplicate_groups
@@ -19,6 +20,7 @@ from .models import chat_model
 from .profile import NOISE, describe_collection
 
 STATIC = Path(__file__).resolve().parent / "static"
+LOCAL_HOSTS = ("127.0.0.1", "localhost")
 
 
 class Review(BaseModel):
@@ -47,7 +49,21 @@ def topic_of(folder_path: str) -> str:
 
 def create_app(db_path: Path | None = None) -> FastAPI:
     app = FastAPI(title="Bower", docs_url=None, redoc_url=None)
+    # The dashboard holds the whole collection, so it answers only to its own
+    # hostnames: a page using DNS rebinding arrives under some other name.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(LOCAL_HOSTS))
     conn = db.connect(db_path)
+
+    @app.middleware("http")
+    async def refuse_cross_origin_writes(request: Request, call_next):
+        origin = request.headers.get("origin")
+        try:
+            foreign = origin is not None and urlsplit(origin).hostname not in LOCAL_HOSTS
+        except ValueError:
+            foreign = True
+        if request.method not in ("GET", "HEAD", "OPTIONS") and foreign:
+            return JSONResponse({"detail": "writes from other origins are refused"}, status_code=403)
+        return await call_next(request)
 
     @app.get("/")
     def index() -> FileResponse:
@@ -312,6 +328,27 @@ def create_app(db_path: Path | None = None) -> FastAPI:
         client = anthropic.Anthropic()
         description, _ = describe_collection(conn)
 
+        def ask(max_tokens: int, schema: dict, prompt: str) -> dict:
+            """One structured call; API failures come back as errors, not tracebacks."""
+            try:
+                response = client.messages.create(
+                    model=chat_model(), max_tokens=max_tokens,
+                    output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
+                    messages=[{"role": "user", "content": prompt}])
+            except anthropic.APIError as exc:
+                raise HTTPException(502, f"the model API failed: {exc.message}") from exc
+            except TypeError as exc:
+                if "authentication" not in str(exc).lower():
+                    raise
+                raise HTTPException(
+                    503, "Ask needs an Anthropic API key — set ANTHROPIC_API_KEY") from exc
+            if response.stop_reason == "refusal":
+                raise HTTPException(502, "the model declined the question")
+            try:
+                return json.loads(next(b.text for b in response.content if b.type == "text"))
+            except (StopIteration, ValueError) as exc:
+                raise HTTPException(502, "the model's answer was not readable JSON") from exc
+
         def fts(query: str, limit: int = 15) -> list[int]:
             fts_query = " OR ".join('"' + t.replace('"', "") + '"' for t in query.split() if t)
             try:
@@ -321,19 +358,13 @@ def create_app(db_path: Path | None = None) -> FastAPI:
             except sqlite3.OperationalError:
                 return []
 
-        expand = client.messages.create(
-            model=chat_model(), max_tokens=1500,
-            output_config={"effort": "low", "format": {"type": "json_schema", "schema": {
-                "type": "object",
-                "properties": {"queries": {"type": "array", "items": {"type": "string"}}},
-                "required": ["queries"], "additionalProperties": False}}},
-            messages=[{"role": "user", "content":
-                       "Produce 3-6 short full-text search queries (2-4 words each) that would find "
-                       "pages relevant to this question in a personal bookmark collection. "
-                       + description + " Question: " + body.question[:500]}])
-        if expand.stop_reason == "refusal":
-            raise HTTPException(502, "the model declined the question")
-        queries = json.loads(next(b.text for b in expand.content if b.type == "text"))["queries"]
+        queries = ask(1500, {
+            "type": "object",
+            "properties": {"queries": {"type": "array", "items": {"type": "string"}}},
+            "required": ["queries"], "additionalProperties": False},
+            "Produce 3-6 short full-text search queries (2-4 words each) that would find "
+            "pages relevant to this question in a personal bookmark collection. "
+            + description + " Question: " + body.question[:500])["queries"]
 
         seen: list[int] = []
         for q in [body.question] + queries:
@@ -358,33 +389,27 @@ def create_app(db_path: Path | None = None) -> FastAPI:
             f"[{i}] {(c['title'] or '')[:100]} | {c['check_url'][:90]} | "
             f"{(c['topics'] or '')[:80]} | {(c['page_description'] or '')[:150]}"
             for i, c in enumerate(candidates))
-        select = client.messages.create(
-            model=chat_model(), max_tokens=4000,
-            output_config={"effort": "low", "format": {"type": "json_schema", "schema": {
-                "type": "object",
-                "properties": {
-                    "groups": {"type": "array", "items": {
-                        "type": "object",
-                        "properties": {
-                            "theme": {"type": "string"},
-                            "items": {"type": "array", "items": {
-                                "type": "object",
-                                "properties": {"index": {"type": "integer"},
-                                               "why": {"type": "string"}},
-                                "required": ["index", "why"], "additionalProperties": False}}},
-                        "required": ["theme", "items"], "additionalProperties": False}},
-                    "note": {"type": "string"}},
-                "required": ["groups", "note"], "additionalProperties": False}}},
-            messages=[{"role": "user", "content":
-                       "You surface links from a personal bookmark collection — you do NOT answer "
-                       "the question, you point to saved links that might help. From the candidates "
-                       "below, pick only genuinely relevant ones, grouped by theme, each with one "
-                       "short line on why it's relevant to the question. If few or none are truly "
-                       "relevant, say so in the note rather than padding.\n\n"
-                       f"Question: {body.question[:500]}\n\nCandidates:\n{listing}"}])
-        if select.stop_reason == "refusal":
-            raise HTTPException(502, "the model declined the question")
-        data = json.loads(next(b.text for b in select.content if b.type == "text"))
+        data = ask(4000, {
+            "type": "object",
+            "properties": {
+                "groups": {"type": "array", "items": {
+                    "type": "object",
+                    "properties": {
+                        "theme": {"type": "string"},
+                        "items": {"type": "array", "items": {
+                            "type": "object",
+                            "properties": {"index": {"type": "integer"},
+                                           "why": {"type": "string"}},
+                            "required": ["index", "why"], "additionalProperties": False}}},
+                    "required": ["theme", "items"], "additionalProperties": False}},
+                "note": {"type": "string"}},
+            "required": ["groups", "note"], "additionalProperties": False},
+            "You surface links from a personal bookmark collection — you do NOT answer "
+            "the question, you point to saved links that might help. From the candidates "
+            "below, pick only genuinely relevant ones, grouped by theme, each with one "
+            "short line on why it's relevant to the question. If few or none are truly "
+            "relevant, say so in the note rather than padding.\n\n"
+            f"Question: {body.question[:500]}\n\nCandidates:\n{listing}")
 
         groups = []
         for g in data.get("groups", []):

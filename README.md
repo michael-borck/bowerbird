@@ -82,6 +82,10 @@ written by the explicit `bowerbird writeback --apply`, and backed up first.
 
 ## Notes
 
+The dashboard answers only to `127.0.0.1` and `localhost` and refuses writes
+sent from other origins, so another website cannot read or change your
+collection through it.
+
 The CLI is also installed under the short alias `bower`, and the Python module
 is `import bowerbird`.
 
