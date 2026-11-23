@@ -4,7 +4,10 @@ Policy (learned from cite-sight, extended for bookmarks):
   - GET, never HEAD — many servers 403 HEAD.
   - Only 404/410 mean dead. 401/403/429/451/5xx mean blocked — refused, not gone.
   - Reaching a login page means the bookmark is alive behind an account (login_wall).
-  - A deep link that 200s after redirecting to the site root is suspect (soft-404).
+   - A deep link that 200s after redirecting to the site root is suspect (soft-404).
+   - A soft-404 needs the error in the page <title>. The same words in page
+     text or script (release notes, nav links, bundled 404 components) are
+     ordinary content.
   - YouTube videos are checked via the oEmbed API — the watch page itself
     returns 200 even for deleted videos.
   - Per-host pacing + bounded global concurrency; one retry on 429/5xx/timeout.
@@ -104,8 +107,8 @@ def classify_response(requested: str, resp: httpx.Response, body: str) -> tuple[
     if 'type="password"' in body and (final.rstrip("/") != requested.rstrip("/") or LOGIN_TITLE_RE.search(title)):
         return "login_wall", "password form on arrival"
 
-    if SOFT404_RE.search(title) or SOFT404_RE.search(body[:20000]):
-        return "dead", f"soft-404 ({title[:60] or 'body text'})"
+    if SOFT404_RE.search(title):
+        return "dead", f"soft-404 ({title[:60]})"
 
     rparts = urlsplit(requested)
     if len(rparts.path) > 1 and fparts.path in ("", "/") and fhost and not rparts.query:

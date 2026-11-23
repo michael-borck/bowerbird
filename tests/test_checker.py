@@ -52,6 +52,22 @@ def test_soft_404_title_is_dead():
     assert "soft-404" in reason
 
 
+def test_error_phrase_in_page_text_alone_is_not_dead():
+    body = ("<html><head><title>Creating a Web App from Scratch - Part 1</title></head>"
+            "<script>const notFound = { title: '404: Not Found' };</script>"
+            "<body><p>The old download is no longer available; see the new one.</p></body></html>")
+    status, reason = classify_response(
+        "https://e.com/post", resp(200, "https://e.com/post"), body)
+    assert status == "live"
+    assert "soft-404" not in reason
+
+
+def test_error_phrase_without_a_title_is_not_dead():
+    status, _ = classify_response(
+        "https://e.com/x", resp(200, "https://e.com/x"), "<html><body>Page not found</body></html>")
+    assert status == "live"
+
+
 def test_deep_link_redirected_to_root_is_suspect():
     status, _ = classify_response(
         "https://e.com/blog/2009/deep/post",
