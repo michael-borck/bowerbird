@@ -1,9 +1,12 @@
 from types import SimpleNamespace
 
+import anthropic
+
 import bowerbird.categorize as categorize
 from bowerbird import db, models, profile
 
-ENVS = ("BOWERBIRD_TAXONOMY_MODEL", "BOWERBIRD_ASSIGN_MODEL", "BOWERBIRD_CHAT_MODEL")
+ENVS = ("BOWERBIRD_TAXONOMY_MODEL", "BOWERBIRD_ASSIGN_MODEL", "BOWERBIRD_CHAT_MODEL",
+        "BOWERBIRD_LLM_PROVIDER")
 
 
 def seeded(conn):
@@ -72,7 +75,7 @@ def test_taxonomy_prompt_describes_the_collection_from_the_data(tmp_path, monkey
             return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(
                 type="text", text='{"categories": [{"name": "Printing", "children": []}]}')])
 
-    monkeypatch.setattr(categorize.anthropic, "Anthropic", FakeAnthropic)
+    monkeypatch.setattr(anthropic, "Anthropic", FakeAnthropic)
     result = categorize.derive_taxonomy(conn)
 
     assert sent["model"] == models.TAXONOMY_DEFAULT

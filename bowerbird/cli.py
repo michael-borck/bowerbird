@@ -117,10 +117,14 @@ def main() -> None:
                                                 concurrency=args.concurrency))))
     elif args.cmd == "categorize":
         from .categorize import assign, derive_taxonomy
-        if args.taxonomy:
-            print(json.dumps(derive_taxonomy(conn)))
-        if args.assign or not args.taxonomy:
-            print(json.dumps(assign(conn, model=args.model, limit=args.limit)))
+        from .llm import LLMError
+        try:
+            if args.taxonomy:
+                print(json.dumps(derive_taxonomy(conn)))
+            if args.assign or not args.taxonomy:
+                print(json.dumps(assign(conn, model=args.model, limit=args.limit)))
+        except LLMError as exc:
+            raise SystemExit(f"bowerbird: {exc}") from exc
     elif args.cmd == "index":
         from .categorize import rebuild_index
         print(json.dumps(rebuild_index(conn)))

@@ -45,8 +45,9 @@ bowerbird serve   # dashboard at http://127.0.0.1:8420
 
 - macOS (browser profile discovery is macOS-path based for now)
 - Python 3.12+
-- An Anthropic API key (`ANTHROPIC_API_KEY`) for the categorisation and Ask
-  features — everything else works without one.
+- An LLM API for the categorisation and Ask features — an Anthropic API key
+  (`ANTHROPIC_API_KEY`), or any OpenAI-compatible endpoint (see Configuration).
+  Everything else works without one.
 
 ## Data location
 
@@ -60,8 +61,14 @@ written by the explicit `bowerbird writeback --apply`, and backed up first.
   collect. Categorisation and Ask use it to make sense of your collection.
   Without it, bowerbird describes the collection from your folder names and
   most-saved hosts.
+- Provider: Anthropic by default. For any OpenAI-compatible endpoint — OpenAI,
+  OpenRouter, Ollama, LM Studio — set `BOWERBIRD_LLM_PROVIDER=openai`,
+  `OPENAI_BASE_URL` (an Ollama server is `http://localhost:11434/v1`) and, if
+  the server needs one, `OPENAI_API_KEY`. A local server keeps categorisation
+  on your machine.
 - Model IDs: `BOWERBIRD_TAXONOMY_MODEL` (taxonomy, and Ask unless overridden),
   `BOWERBIRD_ASSIGN_MODEL` (assignment), `BOWERBIRD_CHAT_MODEL` (Ask alone).
+  With another provider you set them; the built-in defaults are Anthropic's.
 
 ## Commands
 

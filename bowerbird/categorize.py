@@ -13,13 +13,12 @@ overwritten.
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
-import anthropic
-
+from . import llm
+from .llm import LLMError
 from .models import assign_model, taxonomy_model
 from .profile import describe_collection, top_folders
 
@@ -88,34 +87,23 @@ def _sample_items(conn: sqlite3.Connection, n: int = 300) -> list[str]:
 
 def derive_taxonomy(conn: sqlite3.Connection, model: str | None = None) -> dict:
     model = taxonomy_model(model)
-    client = anthropic.Anthropic()
     description, source = describe_collection(conn)
     folders = "\n".join(f"{name}: {count}" for name, count in top_folders(conn).most_common(80))
     sample = "\n".join(_sample_items(conn))
 
-    response = client.messages.create(
-        model=model,
-        max_tokens=8000,
-        output_config={"effort": "medium",
-                       "format": {"type": "json_schema", "schema": TAXONOMY_SCHEMA}},
-        messages=[{
-            "role": "user",
-            "content": (
-                "Design a category taxonomy for a personal bookmark collection. "
-                f"{description} Requirements:\n"
-                "- 12-20 top-level categories, each with 0-8 children (two levels max).\n"
-                "- Merge synonyms and near-duplicates into one canonical name.\n"
-                "- Names are short (1-3 words). No 'Miscellaneous'/'Other' categories.\n"
-                "- The taxonomy must cover the whole collection; prefer broad, durable categories "
-                "over one-off niches.\n\n"
-                f"Existing folder names with bookmark counts:\n{folders}\n\n"
-                f"Random sample of bookmarks (title | domain | folder):\n{sample}"
-            ),
-        }],
-    )
-    if response.stop_reason == "refusal":
-        raise RuntimeError("taxonomy request was refused")
-    data = json.loads(next(b.text for b in response.content if b.type == "text"))
+    data = llm.complete(
+        "Design a category taxonomy for a personal bookmark collection. "
+        f"{description} Requirements:\n"
+        "- 12-20 top-level categories, each with 0-8 children (two levels max).\n"
+        "- Merge synonyms and near-duplicates into one canonical name.\n"
+        "- Names are short (1-3 words). No 'Miscellaneous'/'Other' categories.\n"
+        "- The taxonomy must cover the whole collection; prefer broad, durable categories "
+        "over one-off niches.\n\n"
+        f"Existing folder names with bookmark counts:\n{folders}\n\n"
+        f"Random sample of bookmarks (title | domain | folder):\n{sample}",
+        TAXONOMY_SCHEMA, max_tokens=8000, model=model, effort="medium")
+    if data is None:
+        raise LLMError("the taxonomy request was refused")
 
     paths = []
     for cat in data["categories"]:
@@ -128,29 +116,24 @@ def derive_taxonomy(conn: sqlite3.Connection, model: str | None = None) -> dict:
             "model": model, "profile": source}
 
 
-def _system_prompt(conn: sqlite3.Connection) -> list[dict]:
+def _system_prompt(conn: sqlite3.Connection) -> str:
     taxonomy = "\n".join(r["path"] for r in conn.execute("SELECT path FROM categories ORDER BY path"))
-    return [{
-        "type": "text",
-        "text": (
-            "You categorise bookmarks from a personal collection into a fixed taxonomy.\n\n"
-            "Rules:\n"
-            "- Assign 1 to 3 categories per bookmark, most relevant first, each with a "
-            "confidence between 0 and 1.\n"
-            "- Use ONLY paths from the taxonomy below, exactly as written. Never invent new ones.\n"
-            "- Prefer the most specific applicable path (a child over its parent).\n"
-            "- The bookmark's original folder is a hint about the owner's intent, not ground truth.\n"
-            "- If genuinely nothing fits, return an empty categories array for that item.\n\n"
-            f"Taxonomy:\n{taxonomy}"
-        ),
-        "cache_control": {"type": "ephemeral"},
-    }]
+    return (
+        "You categorise bookmarks from a personal collection into a fixed taxonomy.\n\n"
+        "Rules:\n"
+        "- Assign 1 to 3 categories per bookmark, most relevant first, each with a "
+        "confidence between 0 and 1.\n"
+        "- Use ONLY paths from the taxonomy below, exactly as written. Never invent new ones.\n"
+        "- Prefer the most specific applicable path (a child over its parent).\n"
+        "- The bookmark's original folder is a hint about the owner's intent, not ground truth.\n"
+        "- If genuinely nothing fits, return an empty categories array for that item.\n\n"
+        f"Taxonomy:\n{taxonomy}"
+    )
 
 
 def assign(conn: sqlite3.Connection, model: str | None = None,
            limit: int | None = None, progress_every: int = 10) -> dict:
     model = assign_model(model)
-    client = anthropic.Anthropic()
     valid_paths = {r["path"] for r in conn.execute("SELECT path FROM categories")}
     if not valid_paths:
         raise RuntimeError("no taxonomy — run `bower categorize --taxonomy` first")
@@ -187,22 +170,19 @@ def assign(conn: sqlite3.Connection, model: str | None = None,
                 + (f"\n    description: {desc}" if desc else "")
             )
         try:
-            response = client.messages.create(
-                model=model,
-                max_tokens=8000,
-                system=system,
-                output_config={"format": {"type": "json_schema", "schema": ASSIGN_SCHEMA}},
-                messages=[{"role": "user", "content": "Categorise these bookmarks:\n\n" + "\n".join(lines)}],
-            )
-        except anthropic.APIStatusError as exc:
-            print(f"  batch at {start} failed: {exc.status_code} {exc.message}", flush=True)
+            data = llm.complete("Categorise these bookmarks:\n\n" + "\n".join(lines), ASSIGN_SCHEMA,
+                                max_tokens=8000, model=model, system=system)
+        except LLMError as exc:
+            # A busy provider costs us this batch; anything else is a setup problem worth stopping for.
+            if exc.advice or not (exc.status == 429 or (exc.status or 0) >= 500):
+                raise
+            print(f"  batch at {start} failed: {exc}", flush=True)
             skipped += len(batch)
             continue
-        if response.stop_reason == "refusal":
+        if data is None:
             skipped += len(batch)
             continue
 
-        data = json.loads(next(b.text for b in response.content if b.type == "text"))
         for item in data.get("items", []):
             idx = item.get("index")
             if not isinstance(idx, int) or not 0 <= idx < len(batch):

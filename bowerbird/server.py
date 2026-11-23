@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -14,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import db
+from . import db, llm
 from .duplicates import duplicate_groups
 from .models import chat_model
 from .profile import NOISE, describe_collection
@@ -324,30 +323,17 @@ def create_app(db_path: Path | None = None) -> FastAPI:
 
     @app.post("/api/chat")
     def chat(body: ChatQ) -> dict:
-        import anthropic
-        client = anthropic.Anthropic()
         description, _ = describe_collection(conn)
 
         def ask(max_tokens: int, schema: dict, prompt: str) -> dict:
-            """One structured call; API failures come back as errors, not tracebacks."""
+            """One structured call; failures come back as errors, not tracebacks."""
             try:
-                response = client.messages.create(
-                    model=chat_model(), max_tokens=max_tokens,
-                    output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
-                    messages=[{"role": "user", "content": prompt}])
-            except anthropic.APIError as exc:
-                raise HTTPException(502, f"the model API failed: {exc.message}") from exc
-            except TypeError as exc:
-                if "authentication" not in str(exc).lower():
-                    raise
-                raise HTTPException(
-                    503, "Ask needs an Anthropic API key — set ANTHROPIC_API_KEY") from exc
-            if response.stop_reason == "refusal":
+                data = llm.complete(prompt, schema, max_tokens, model=chat_model(), effort="low")
+            except llm.LLMError as exc:
+                raise HTTPException(503 if exc.advice else 502, str(exc)) from exc
+            if data is None:
                 raise HTTPException(502, "the model declined the question")
-            try:
-                return json.loads(next(b.text for b in response.content if b.type == "text"))
-            except (StopIteration, ValueError) as exc:
-                raise HTTPException(502, "the model's answer was not readable JSON") from exc
+            return data
 
         def fts(query: str, limit: int = 15) -> list[int]:
             fts_query = " OR ".join('"' + t.replace('"', "") + '"' for t in query.split() if t)
