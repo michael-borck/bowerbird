@@ -107,12 +107,14 @@ def test_only_visits_to_bookmarked_pages_are_kept(tmp_path):
                  "VALUES(1,'chromium','Brave','Test',?)", (str(bookmarks),))
     conn.commit()
     source = conn.execute("SELECT * FROM sources").fetchone()
+    assert source is not None
     ingest_source(conn, source)
 
     assert ingest.ingest_chromium_history(conn, source) == {"history_rows": 1}
     assert [tuple(r) for r in conn.execute("SELECT url, visit_count FROM history")] == [
         ("https://e.com/kept?utm_source=x", 3)]
-    assert db.history_note(conn) == f"Brave history back to {chrome_ts_to_iso(STAMP)[:10]}"
+    first = chrome_ts_to_iso(STAMP) or ""
+    assert db.history_note(conn) == f"Brave history back to {first[:10]}"
 
 
 def test_visits_to_pages_no_longer_bookmarked_are_dropped(tmp_path, monkeypatch):

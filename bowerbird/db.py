@@ -244,14 +244,14 @@ def record_history_window(conn: sqlite3.Connection, browser: str,
                           first: str | None, last: str | None) -> None:
     """Remember how far back a browser's visit records go (`first` is None when
     they are not time-limited)."""
-    windows = json.loads(meta_get(conn, "history_windows", "{}"))
+    windows = json.loads(meta_get(conn, "history_windows") or "{}")
     windows[browser] = {"first": first, "last": last}
     meta_set(conn, "history_windows", json.dumps(windows))
 
 
 def history_note(conn: sqlite3.Connection) -> str:
     """One line on what "visited" can mean here, for the dashboard and the report."""
-    windows = json.loads(meta_get(conn, "history_windows", "{}"))
+    windows = json.loads(meta_get(conn, "history_windows") or "{}")
     parts = [f"{browser} history back to {w['first'][:10]}" if w.get("first")
              else f"{browser}: any visit on record"
              for browser, w in sorted(windows.items())]

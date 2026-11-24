@@ -89,7 +89,8 @@ def youtube_video_id(url: str) -> str | None:
         return parts.path.strip("/").split("/")[0] or None
     if host in ("youtube.com", "music.youtube.com"):
         if parts.path == "/watch":
-            return (parse_qs(parts.query).get("v") or [None])[0]
+            video = parse_qs(parts.query).get("v")
+            return video[0] if video else None
         m = re.match(r"^/(embed|shorts|live|v)/([\w-]{6,})", parts.path)
         if m:
             return m.group(2)
@@ -223,7 +224,7 @@ async def run_check(
             async with sem:
                 try:
                     return row["id"], await check_one(client, pacer, row["check_url"])
-                except Exception as exc:  # one bad row must not cost us the whole run  # noqa: BLE001
+                except Exception as exc:  # one bad row must not cost us the whole run
                     return row["id"], {"status": "error", "reason": f"{type(exc).__name__}: {exc}"[:200],
                                        "http_status": None, "final_url": None, "elapsed_ms": None}
 

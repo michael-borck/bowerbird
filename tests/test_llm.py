@@ -31,6 +31,7 @@ def openai(monkeypatch):
 
     def handle(request):
         requests.append(request)
+        assert handler is not None, "call install(server) before anything is fetched"
         return handler(request)
 
     monkeypatch.setenv("BOWERBIRD_LLM_PROVIDER", "openai")
@@ -112,7 +113,7 @@ def test_openai_path_rejected_key_is_a_mistake_on_our_side(openai):
     openai(lambda request: httpx.Response(401, json={"error": {"message": "invalid api key"}}))
     with pytest.raises(llm.LLMError) as caught:
         llm.complete("find", SCHEMA, 100, model="llama3")
-    assert caught.value.status == 401 and "OPENAI_API_KEY" in caught.value.advice
+    assert caught.value.status == 401 and "OPENAI_API_KEY" in (caught.value.advice or "")
     assert "invalid api key" in str(caught.value)
 
 
@@ -120,7 +121,7 @@ def test_openai_path_unknown_model_points_at_the_settings(openai):
     openai(lambda request: httpx.Response(404, json={"error": {"message": "model 'llama3' not found"}}))
     with pytest.raises(llm.LLMError) as caught:
         llm.complete("find", SCHEMA, 100, model="llama3")
-    assert "BOWERBIRD_TAXONOMY_MODEL" in caught.value.advice
+    assert "BOWERBIRD_TAXONOMY_MODEL" in (caught.value.advice or "")
 
 
 def test_openai_path_catches_anthropic_model_ids(openai, monkeypatch):
@@ -128,7 +129,7 @@ def test_openai_path_catches_anthropic_model_ids(openai, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     with pytest.raises(llm.LLMError) as caught:
         llm.complete("find", SCHEMA, 100, model=models.ASSIGN_DEFAULT)
-    assert "BOWERBIRD_ASSIGN_MODEL" in caught.value.advice
+    assert "BOWERBIRD_ASSIGN_MODEL" in (caught.value.advice or "")
 
 
 def test_unreadable_answer_is_an_error(openai):
@@ -220,7 +221,7 @@ def test_anthropic_path_missing_key_is_a_mistake_on_our_side(anthropic_sdk):
     anthropic_sdk(FakeAnthropic(raise_=TypeError("Could not resolve authentication method.")))
     with pytest.raises(llm.LLMError) as caught:
         llm.complete("sort", SCHEMA, 100, model="m")
-    assert "ANTHROPIC_API_KEY" in caught.value.advice and str(caught.value).endswith("set ANTHROPIC_API_KEY")
+    assert "ANTHROPIC_API_KEY" in (caught.value.advice or "") and str(caught.value).endswith("set ANTHROPIC_API_KEY")
 
 
 def test_anthropic_path_api_failure_keeps_the_status(anthropic_sdk):

@@ -27,7 +27,7 @@ def ingest_all(conn: sqlite3.Connection, source_id: int | None = None, history: 
     for source in rows:
         try:
             stats = ingest_source(conn, source)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # a store that cannot be read is one failed line, not a lost run
             conn.rollback()
             stats = {"source": f"{source['browser']}/{source['profile']}",
                      "error": f"{type(exc).__name__}: {exc}"[:200]}
@@ -39,7 +39,7 @@ def ingest_all(conn: sqlite3.Connection, source_id: int | None = None, history: 
             if source["kind"] == "chromium" and "error" not in stats:
                 try:
                     stats |= ingest_chromium_history(conn, source)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:  # a History file that cannot be read costs its line only
                     conn.rollback()
                     stats["history_error"] = f"{type(exc).__name__}: {exc}"[:200]
 
@@ -112,7 +112,7 @@ def main() -> None:
         try:
             from .categorize import assign
             print(json.dumps({"categorize": assign(conn)}))
-        except Exception as exc:  # no taxonomy yet, or no API credentials  # noqa: BLE001
+        except Exception as exc:  # no taxonomy yet, or no API credentials
             print(json.dumps({"categorize": f"skipped: {exc}"}))
         from .categorize import rebuild_index
         print(json.dumps({"index": rebuild_index(conn)}))

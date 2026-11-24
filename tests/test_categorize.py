@@ -30,12 +30,11 @@ def conn(tmp_path):
 
 
 def model_that(monkeypatch, reply):
-    """Stand in for the Anthropic SDK; `reply` gives each answer in turn.
+    """Stand in for the Anthropic SDK; `reply(kwargs)` gives each answer.
 
     Returns the list of prompts the model was asked.
     """
     asked = []
-    replies = iter(reply) if isinstance(reply, list) else None
 
     class FakeAnthropic:
         def __init__(self, *args, **kwargs):
@@ -43,7 +42,7 @@ def model_that(monkeypatch, reply):
 
         def create(self, **kwargs):
             asked.append(kwargs["messages"][0]["content"])
-            result = next(replies) if replies else reply(kwargs)
+            result = reply(kwargs)
             if isinstance(result, Exception):
                 raise result
             if result is REFUSED:
@@ -79,7 +78,8 @@ def test_only_links_without_a_category_are_sent_and_all_marked_seen(conn, monkey
 
 def test_a_batch_the_provider_could_not_answer_is_tried_again_next_run(conn, monkeypatch):
     too_busy = anthropic.RateLimitError(message="slow down", response=httpx.Response(429, request=REQUEST), body=None)
-    asked = model_that(monkeypatch, [too_busy, MIXED])
+    answers = iter([too_busy, MIXED])
+    asked = model_that(monkeypatch, lambda kwargs: next(answers))
 
     assert categorize.assign(conn) == {"assigned": 0, "skipped": 3, "batches": 0}
     assert conn.execute("SELECT COUNT(*) FROM urls WHERE categorized_at IS NULL").fetchone()[0] == 3

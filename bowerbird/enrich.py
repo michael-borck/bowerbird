@@ -89,7 +89,7 @@ async def run_enrich(conn: sqlite3.Connection, limit: int | None = None,
                     return row["id"], None, None, None, True   # no client can ever request this URL
                 except httpx.HTTPError:
                     return row["id"], None, None, None, False
-                except Exception:  # noqa: BLE001
+                except Exception:  # one bad row must not cost us the whole run
                     return row["id"], None, None, None, False   # one bad row must not cost us the whole run
 
         for coro in asyncio.as_completed([fetch(r) for r in rows]):

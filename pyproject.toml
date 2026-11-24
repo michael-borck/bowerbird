@@ -51,6 +51,26 @@ dev = [
     "pytest>=9.1.1",
 ]
 
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = ["**/._*"]
+
 [tool.ruff.lint]
-# An exFAT volume marks every file executable, so this fires on every source file there.
-ignore = ["EXE002"]
+# The selection the fleet's other Python apps use.
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.basedpyright]
+include = ["bowerbird", "tests"]
+exclude = ["**/__pycache__", "**/._*"]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImport = true
+reportUnusedClass = true
+# FastAPI registers route handlers by decorator, which this rule cannot see.
+reportUnusedFunction = false
+reportUnusedVariable = true
+reportDuplicateImport = true
