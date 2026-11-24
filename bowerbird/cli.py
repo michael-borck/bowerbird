@@ -10,7 +10,7 @@ from pathlib import Path
 
 from . import db
 from .checker import run_check
-from .ingest import ingest_chromium_history, ingest_source, prune_history
+from .ingest import ingest_chromium_history, ingest_source, prune_history, prune_urls
 from .report import build_report
 from .sources import detect, register
 
@@ -46,6 +46,7 @@ def ingest_all(conn: sqlite3.Connection, source_id: int | None = None, history: 
     for _, stats in reported:
         print(json.dumps(stats))
     prune_history(conn)
+    prune_urls(conn)
 
 
 def main() -> None:

@@ -273,3 +273,26 @@ def prune_history(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM history WHERE canonical_url NOT IN "
                  "(SELECT canonical_url FROM bookmarks WHERE removed=0)")
     conn.commit()
+
+
+PRUNE_AFTER = timedelta(days=30)
+
+
+def prune_urls(conn: sqlite3.Connection) -> None:
+    """Forget URLs no bookmark has pointed at for PRUNE_AFTER, with their categories.
+
+    The wait covers a store that is briefly unreadable, or a bookmark that
+    comes back. What goes with the row is only derived: a check verdict, a
+    category, page text.
+    """
+    cutoff = (datetime.now(timezone.utc) - PRUNE_AFTER).isoformat()
+    stale = """SELECT u.id FROM urls u
+               WHERE NOT EXISTS (SELECT 1 FROM bookmarks b
+                                 WHERE b.canonical_url=u.canonical_url AND b.removed=0)
+                 AND NOT EXISTS (SELECT 1 FROM bookmarks b JOIN runs r ON r.id=b.last_seen_run
+                                 WHERE b.canonical_url=u.canonical_url AND r.started_at > ?)"""
+    conn.execute(f"DELETE FROM url_categories WHERE url_id IN ({stale})", (cutoff,))
+    conn.execute(f"DELETE FROM search WHERE url_id IN (SELECT CAST(id AS TEXT) FROM ({stale}))",
+                 (cutoff,))
+    conn.execute(f"DELETE FROM urls WHERE id IN ({stale})", (cutoff,))
+    conn.commit()

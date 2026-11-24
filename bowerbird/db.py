@@ -76,7 +76,14 @@ CREATE TABLE IF NOT EXISTS urls (
     enrich_attempts INTEGER NOT NULL DEFAULT 0,
     categorized_at TEXT,
     review TEXT,
-    reviewed_at TEXT
+    reviewed_at TEXT,
+    page_title TEXT,
+    page_description TEXT,
+    page_text TEXT,
+    enriched_at TEXT,
+    wayback_url TEXT,
+    wayback_at TEXT,
+    wayback_checked_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_urls_status ON urls(status);
 
@@ -216,6 +223,7 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=15000")
+    conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
     conn.executescript(FTS_SCHEMA)
     _migrate(conn)
