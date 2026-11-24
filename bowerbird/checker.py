@@ -24,7 +24,7 @@ import asyncio
 import re
 import sqlite3
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, quote, urlsplit
 
 import httpx
@@ -54,15 +54,15 @@ AUTH_HOST_RE = re.compile(
 )
 LOGIN_PATH_RE = re.compile(
     r"/(log-?in|sign-?in|sign_in|users/sign_in|account/login|auth|sso|session/new|"
-    r"wp-login\.php|oauth2?|authorize)([/?#]|$)", re.I
+    r"wp-login\.php|oauth2?|authorize)([/?#]|$)", re.IGNORECASE
 )
-LOGIN_TITLE_RE = re.compile(r"\b(log ?in|sign ?in|authenticate|authentication required)\b", re.I)
+LOGIN_TITLE_RE = re.compile(r"\b(log ?in|sign ?in|authenticate|authentication required)\b", re.IGNORECASE)
 SOFT404_RE = re.compile(
     r"(page (you('re| are)? looking for )?(was |could )?not( be)? found|"
     r"404 not found|page doesn.t exist|no longer (available|exists)|"
-    r"content (is )?unavailable|video unavailable|this page isn.t available)", re.I
+    r"content (is )?unavailable|video unavailable|this page isn.t available)", re.IGNORECASE
 )
-TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
+TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 
 
 class HostPacer:
@@ -198,7 +198,7 @@ async def run_check(
         where, params = "status <> 'skipped'", []
     else:
         # First probes, plus another go at unreachable links whose last probe is old enough.
-        cutoff = (datetime.now(timezone.utc) - RECHECK_AFTER).isoformat()
+        cutoff = (datetime.now(UTC) - RECHECK_AFTER).isoformat()
         where = ("status = 'unchecked' OR (status IN ('error','timeout')"
                  " AND COALESCE(checked_at, '') <= ?)")
         params = [cutoff]
@@ -223,7 +223,7 @@ async def run_check(
             async with sem:
                 try:
                     return row["id"], await check_one(client, pacer, row["check_url"])
-                except Exception as exc:  # one bad row must not cost us the whole run
+                except Exception as exc:  # one bad row must not cost us the whole run  # noqa: BLE001
                     return row["id"], {"status": "error", "reason": f"{type(exc).__name__}: {exc}"[:200],
                                        "http_status": None, "final_url": None, "elapsed_ms": None}
 
@@ -237,7 +237,7 @@ async def run_check(
                    WHERE id=?""",
                 (result["status"], result["http_status"], result["final_url"],
                  result["reason"], result["elapsed_ms"],
-                 datetime.now(timezone.utc).isoformat(), result["status"], url_id),
+                 datetime.now(UTC).isoformat(), result["status"], url_id),
             )
             counts[result["status"]] = counts.get(result["status"], 0) + 1
             done += 1

@@ -3,8 +3,7 @@ import asyncio
 import httpx
 import pytest
 
-import bowerbird.enrich as enrich
-from bowerbird import db
+from bowerbird import db, enrich
 
 
 @pytest.fixture

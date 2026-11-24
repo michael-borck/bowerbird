@@ -3,7 +3,7 @@ import asyncio
 import httpx
 import pytest
 
-import bowerbird.checker as checker
+from bowerbird import checker
 from bowerbird.checker import classify_response, youtube_video_id
 
 

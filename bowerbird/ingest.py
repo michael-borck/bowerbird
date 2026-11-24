@@ -13,15 +13,15 @@ import plistlib
 import shutil
 import sqlite3
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from .canonical import canonicalize, is_checkable
 from .db import record_history_window
 
-_CHROME_EPOCH = datetime(1601, 1, 1, tzinfo=timezone.utc)
-_UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-_MAC_EPOCH = datetime(2001, 1, 1, tzinfo=timezone.utc)
+_CHROME_EPOCH = datetime(1601, 1, 1, tzinfo=UTC)
+_UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+_MAC_EPOCH = datetime(2001, 1, 1, tzinfo=UTC)
 
 
 def chrome_ts_to_iso(value: str | int | None) -> str | None:
@@ -121,7 +121,7 @@ def parse_safari(path: Path) -> list[dict]:
                 "url": node.get("URLString", ""),
                 "folder_path": "/".join(crumbs),
                 "root": "safari",
-                "date_added": added.replace(tzinfo=timezone.utc).isoformat()
+                "date_added": added.replace(tzinfo=UTC).isoformat()
                               if isinstance(added, datetime) else None,
                 "date_last_used": None,
             })
@@ -151,7 +151,7 @@ def ingest_source(conn: sqlite3.Connection, source: sqlite3.Row) -> dict:
 
     run_id = conn.execute(
         "INSERT INTO runs(kind, started_at) VALUES('ingest', ?)",
-        (datetime.now(timezone.utc).isoformat(),),
+        (datetime.now(UTC).isoformat(),),
     ).lastrowid
 
     new = updated = 0
@@ -204,9 +204,9 @@ def ingest_source(conn: sqlite3.Connection, source: sqlite3.Row) -> dict:
     stats = {"source": f"{source['browser']}/{source['profile']}",
              "found": len(found), "new": new, "updated": updated, "marked_removed": gone}
     conn.execute("UPDATE runs SET finished_at=?, stats=? WHERE id=?",
-                 (datetime.now(timezone.utc).isoformat(), json.dumps(stats), run_id))
+                 (datetime.now(UTC).isoformat(), json.dumps(stats), run_id))
     conn.execute("UPDATE sources SET last_ingested=? WHERE id=?",
-                 (datetime.now(timezone.utc).isoformat(), source["id"]))
+                 (datetime.now(UTC).isoformat(), source["id"]))
     conn.commit()
     return stats
 
@@ -285,7 +285,7 @@ def prune_urls(conn: sqlite3.Connection) -> None:
     comes back. What goes with the row is only derived: a check verdict, a
     category, page text.
     """
-    cutoff = (datetime.now(timezone.utc) - PRUNE_AFTER).isoformat()
+    cutoff = (datetime.now(UTC) - PRUNE_AFTER).isoformat()
     stale = """SELECT u.id FROM urls u
                WHERE NOT EXISTS (SELECT 1 FROM bookmarks b
                                  WHERE b.canonical_url=u.canonical_url AND b.removed=0)

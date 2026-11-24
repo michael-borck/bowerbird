@@ -18,11 +18,11 @@ import shutil
 import sqlite3
 import subprocess
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from .duplicates import GRAVEYARD, duplicate_groups, in_graveyard
 from .db import data_home
+from .duplicates import GRAVEYARD, duplicate_groups, in_graveyard
 
 BROWSER_PROCESSES = {"Brave": "Brave Browser", "Chrome": "Google Chrome",
                      "Edge": "Microsoft Edge", "Vivaldi": "Vivaldi", "Chromium": "Chromium"}
@@ -30,11 +30,11 @@ BROWSER_PROCESSES = {"Brave": "Brave Browser", "Chrome": "Google Chrome",
 
 def _browser_running(browser: str) -> bool:
     name = BROWSER_PROCESSES.get(browser, browser)
-    return subprocess.run(["pgrep", "-x", name], capture_output=True).returncode == 0
+    return subprocess.run(["pgrep", "-x", name], capture_output=True, check=False).returncode == 0
 
 
 def _chrome_now() -> str:
-    delta = datetime.now(timezone.utc) - datetime(1601, 1, 1, tzinfo=timezone.utc)
+    delta = datetime.now(UTC) - datetime(1601, 1, 1, tzinfo=UTC)
     return str(int(delta.total_seconds() * 1_000_000))
 
 

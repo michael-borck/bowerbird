@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -48,9 +48,9 @@ def test_foreign_keys_are_enforced(tmp_path):
 
 
 def test_urls_are_forgotten_once_no_bookmark_has_pointed_at_them_for_a_month(tmp_path):
-    import bowerbird.ingest as ingest
+    from bowerbird import ingest
 
-    recent = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    recent = (datetime.now(UTC) - timedelta(days=2)).isoformat()
     conn = db.connect(tmp_path / "test.db")
     conn.execute("INSERT INTO sources(id, kind, browser, profile, path) "
                  "VALUES(1,'chromium','Brave','Test','/tmp/nonexistent')")

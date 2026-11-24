@@ -14,20 +14,20 @@ from __future__ import annotations
 import asyncio
 import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 import httpx
 
-from .checker import BODY_CAP, HEADERS, HostPacer, TITLE_RE
+from .checker import BODY_CAP, HEADERS, TITLE_RE, HostPacer
 
 DESC_RE = re.compile(
     r'<meta[^>]+(?:name=["\']description["\']|property=["\']og:description["\'])'
-    r'[^>]+content=["\']([^"\']{1,500})', re.I)
+    r'[^>]+content=["\']([^"\']{1,500})', re.IGNORECASE)
 DESC_RE_REV = re.compile(
     r'<meta[^>]+content=["\']([^"\']{1,500})["\'][^>]+'
-    r'(?:name=["\']description["\']|property=["\']og:description["\'])', re.I)
-STRIP_RE = re.compile(r"<(script|style|noscript|svg|head)[^>]*>.*?</\1>", re.I | re.S)
+    r'(?:name=["\']description["\']|property=["\']og:description["\'])', re.IGNORECASE)
+STRIP_RE = re.compile(r"<(script|style|noscript|svg|head)[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL)
 TAG_RE = re.compile(r"<[^>]+>")
 
 ENRICHABLE = ("live", "login_wall", "suspect")
@@ -89,7 +89,7 @@ async def run_enrich(conn: sqlite3.Connection, limit: int | None = None,
                     return row["id"], None, None, None, True   # no client can ever request this URL
                 except httpx.HTTPError:
                     return row["id"], None, None, None, False
-                except Exception:
+                except Exception:  # noqa: BLE001
                     return row["id"], None, None, None, False   # one bad row must not cost us the whole run
 
         for coro in asyncio.as_completed([fetch(r) for r in rows]):
@@ -98,7 +98,7 @@ async def run_enrich(conn: sqlite3.Connection, limit: int | None = None,
                 conn.execute(
                     "UPDATE urls SET page_title=?, page_description=?, page_text=?, enriched_at=? "
                     "WHERE id=?",
-                    (title, desc, page_text, datetime.now(timezone.utc).isoformat(), url_id))
+                    (title, desc, page_text, datetime.now(UTC).isoformat(), url_id))
                 done += 1
                 ok += bool(title or desc)
             else:

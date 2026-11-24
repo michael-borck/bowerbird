@@ -2,8 +2,7 @@ from types import SimpleNamespace
 
 import anthropic
 
-import bowerbird.categorize as categorize
-from bowerbird import db, models, profile
+from bowerbird import categorize, db, models, profile
 
 ENVS = ("BOWERBIRD_TAXONOMY_MODEL", "BOWERBIRD_ASSIGN_MODEL", "BOWERBIRD_CHAT_MODEL",
         "BOWERBIRD_LLM_PROVIDER")

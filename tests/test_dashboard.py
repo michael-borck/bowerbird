@@ -14,9 +14,10 @@ needs_node = pytest.mark.skipif(NODE is None, reason="node is not installed")
 
 def run_helpers(checks: str) -> None:
     """Evaluate the page's helpers: everything before it starts wiring up the DOM."""
-    script = re.search(r"<script>(.*)</script>", HTML.read_text(encoding="utf-8"), re.S).group(1)
+    script = re.search(r"<script>(.*)</script>", HTML.read_text(encoding="utf-8"), re.DOTALL).group(1)
     helpers = script[:script.index('document.querySelectorAll(".nav-item")')]
-    result = subprocess.run([NODE, "-"], input=helpers + "\n" + checks, text=True, capture_output=True)
+    result = subprocess.run([NODE, "-"], input=helpers + "\n" + checks, text=True,
+                            capture_output=True, check=False)
     assert result.returncode == 0, result.stderr
 
 

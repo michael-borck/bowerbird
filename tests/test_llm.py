@@ -7,10 +7,8 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-import bowerbird.categorize as categorize
-import bowerbird.llm as llm
 import bowerbird.profile
-from bowerbird import db, models
+from bowerbird import categorize, db, llm, models
 from bowerbird.server import create_app
 
 SCHEMA = {"type": "object", "properties": {"queries": {"type": "array", "items": {"type": "string"}}},
@@ -87,7 +85,7 @@ def test_openai_path_falls_back_when_structured_output_is_not_understood(openai)
 
     requests = openai(server)
     assert llm.complete("find", SCHEMA, 100, model="llama3") == {"queries": ["x"]}
-    first, second = bodies(requests)
+    _, second = bodies(requests)
     assert "response_format" not in second
     assert second["messages"][0]["role"] == "system" and second["messages"][1]["content"] == "find"
 
@@ -164,7 +162,7 @@ def test_assign_runs_over_an_openai_compatible_server(openai, monkeypatch, tmp_p
     def server(request):
         listing = json.loads(request.content)["messages"][-1]["content"]
         items = [{"index": i, "categories": [{"path": "Printing", "confidence": 0.9}]}
-                 for i in range(len(re.findall(r"^\[\d+\]", listing, re.M)))]
+                 for i in range(len(re.findall(r"^\[\d+\]", listing, re.MULTILINE)))]
         return completion(json.dumps({"items": items}))
 
     openai(server)

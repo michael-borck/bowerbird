@@ -14,7 +14,7 @@ a category for it; only a batch the provider failed to answer is retried.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 from . import llm
@@ -153,7 +153,7 @@ def assign(conn: sqlite3.Connection, model: str | None = None,
     if not rows:
         return {"assigned": 0}
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     cat_ids = {r["path"]: r["id"] for r in conn.execute("SELECT id, path FROM categories")}
     assigned = skipped = batches = 0
 

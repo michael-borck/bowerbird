@@ -5,8 +5,7 @@ import anthropic
 import httpx
 import pytest
 
-import bowerbird.categorize as categorize
-from bowerbird import db
+from bowerbird import categorize, db
 from bowerbird.llm import LLMError
 
 REFUSED = object()

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -69,7 +69,7 @@ async def run_wayback(conn: sqlite3.Connection, limit: int | None = None,
                 # failed lookups stay eligible for the next run.
                 conn.execute(
                     "UPDATE urls SET wayback_url=?, wayback_at=?, wayback_checked_at=? WHERE id=?",
-                    (snapshot_url, snapshot_ts, datetime.now(timezone.utc).isoformat(), row["id"]))
+                    (snapshot_url, snapshot_ts, datetime.now(UTC).isoformat(), row["id"]))
                 conn.commit()  # per row — an open transaction across sleeps starves other writers
                 found += bool(snapshot_url)
                 done += 1

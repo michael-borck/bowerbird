@@ -1,9 +1,7 @@
 import json
 import sqlite3
 
-import bowerbird.cli as cli
-import bowerbird.ingest as ingest
-from bowerbird import db
+from bowerbird import cli, db, ingest
 from bowerbird.ingest import chrome_ts_to_iso, ingest_source, unix_us_to_iso
 
 ADDED = "13300000000000000"
@@ -45,7 +43,7 @@ def test_impossible_dates_become_unknown():
 
 
 def test_a_source_that_fails_does_not_stop_the_others_and_recovers(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(cli, "detect", lambda: [])    # nothing from the machine running the tests
+    monkeypatch.setattr(cli, "detect", list)    # nothing from the machine running the tests
     flaky = chromium_file(tmp_path / "flaky", "https://e.com/first", "https://e.com/boom", "https://e.com/last")
     fine = chromium_file(tmp_path / "fine", "https://e.com/fine")
     broken = tmp_path / "broken.json"
@@ -118,7 +116,7 @@ def test_only_visits_to_bookmarked_pages_are_kept(tmp_path):
 
 
 def test_visits_to_pages_no_longer_bookmarked_are_dropped(tmp_path, monkeypatch):
-    monkeypatch.setattr(cli, "detect", lambda: [])
+    monkeypatch.setattr(cli, "detect", list)
     bookmarks = chromium_file(tmp_path / "Bookmarks", "https://e.com/kept")
     db_path = tmp_path / "cli.db"
     conn = db.connect(db_path)
@@ -137,7 +135,7 @@ def test_visits_to_pages_no_longer_bookmarked_are_dropped(tmp_path, monkeypatch)
 
 
 def test_a_visit_counts_for_a_bookmark_saved_in_a_later_source(tmp_path, monkeypatch):
-    monkeypatch.setattr(cli, "detect", lambda: [])
+    monkeypatch.setattr(cli, "detect", list)
     first = chromium_file(tmp_path / "first", "https://e.com/mine")
     second = chromium_file(tmp_path / "second", "https://e.com/theirs")
     chromium_history(tmp_path / "History", ("https://e.com/theirs", 2, STAMP))

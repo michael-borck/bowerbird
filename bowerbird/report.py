@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -35,12 +35,12 @@ def build_report(conn: sqlite3.Connection, out: Path | None = None) -> str:
 
     lines = [
         "# Bowerbird audit report",
-        f"_Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
+        f"_Generated {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}_",
         "",
         "## Totals",
         f"- Bookmarks in Brave: **{total_bm:,}**",
-        f"- Unique URLs after canonicalisation: **{unique:,}** "
-        f"(**{dupes:,}** duplicate bookmark entries collapse)",
+        (f"- Unique URLs after canonicalisation: **{unique:,}** "
+         f"(**{dupes:,}** duplicate bookmark entries collapse)"),
         f"- Checked so far: **{checked:,}** of {unique:,}",
         f"- Bookmarks with a recorded visit: **{visited:,}** ({history_note(conn)})",
         "",

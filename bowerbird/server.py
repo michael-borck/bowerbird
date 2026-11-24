@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -264,7 +263,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
                 raise HTTPException(400, "no Wayback snapshot recorded for this URL")
         cur = conn.execute(
             "UPDATE urls SET review=?, reviewed_at=? WHERE id=?",
-            (body.decision, datetime.now(timezone.utc).isoformat(), url_id))
+            (body.decision, datetime.now(UTC).isoformat(), url_id))
         conn.commit()
         if not cur.rowcount:
             raise HTTPException(404, "no such url")
@@ -326,7 +325,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
         ids = [r["id"] for r in conn.execute(
             "SELECT id, check_url FROM urls WHERE review IS NULL AND status <> 'skipped'")
             if (urlsplit(r["check_url"]).hostname or "").lower().removeprefix("www.") == target]
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         for url_id in ids:
             conn.execute("UPDATE urls SET review=?, reviewed_at=? WHERE id=?",
                          (body.decision, now, url_id))
@@ -426,7 +425,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
 
     @app.post("/api/graveyard/bulk")
     def graveyard_bulk(body: Bulk) -> dict:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         gone = f"{db.FAILED} AND review IS NULL"
         if body.scope == "replace_snapshots":
             cur = conn.execute(

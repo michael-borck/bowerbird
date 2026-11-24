@@ -1,17 +1,15 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-import bowerbird.checker as checker
-import bowerbird.wayback as wayback
-from bowerbird import db
+from bowerbird import checker, db, wayback
 from bowerbird.server import create_app
 
-OLD = (datetime.now(timezone.utc) - timedelta(hours=8)).isoformat()
-FRESH = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+OLD = (datetime.now(UTC) - timedelta(hours=8)).isoformat()
+FRESH = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
 
 
 @pytest.fixture

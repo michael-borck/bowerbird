@@ -77,8 +77,7 @@ def canonicalize(url: str) -> str:
         host = "youtube.com"
         query = [(k, v) for k, v in query if k not in YOUTUBE_DROP]
 
-    if host.startswith("www."):
-        host = host[4:]
+    host = host.removeprefix("www.")
 
     port = _port(parts)
     if port is _UNUSABLE:
