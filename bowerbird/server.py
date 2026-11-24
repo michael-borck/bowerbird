@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import db, llm
-from .duplicates import duplicate_groups
+from .duplicates import duplicate_groups, in_graveyard
 from .models import chat_model
 from .profile import NOISE, describe_collection
 
@@ -88,15 +88,19 @@ def create_app(db_path: Path | None = None) -> FastAPI:
         ).fetchone()["c"]
 
         # Prefer LLM categories once they exist; fall back to folder-derived topics.
-        cat_topics = {r["path"]: r["c"] for r in conn.execute(
-            """SELECT c.path, COUNT(DISTINCT uc.url_id) c FROM url_categories uc
-               JOIN categories c ON c.id=uc.category_id
-               WHERE c.path NOT LIKE '% / %' GROUP BY c.path""")}
+        # The chart is of top-level themes, so "Parent / Child" counts towards
+        # its parent: the model is told to prefer the most specific category.
+        cat_topics = {r["top"]: r["c"] for r in conn.execute(
+            """SELECT CASE WHEN instr(c.path, ' / ') THEN substr(c.path, 1, instr(c.path, ' / ') - 1)
+                          ELSE c.path END AS top,
+                      COUNT(DISTINCT uc.url_id) c
+               FROM url_categories uc JOIN categories c ON c.id = uc.category_id
+               GROUP BY top""")}
         topics: dict[str, int] = dict(cat_topics)
         years: dict[str, int] = {}
         domains: dict[str, int] = {}
         for r in conn.execute("SELECT folder_path, date_added, url FROM bookmarks WHERE removed=0"):
-            if not cat_topics:
+            if not cat_topics and not in_graveyard(r["folder_path"]):
                 topics[topic_of(r["folder_path"])] = topics.get(topic_of(r["folder_path"]), 0) + 1
             if r["date_added"]:
                 y = r["date_added"][:4]
@@ -117,6 +121,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
             "status_counts": status_counts,
             "last_checked": checked_at,
             "unreachable_confirmed": unreachable,
+            "topics_source": "llm" if cat_topics else "folders",
             "visited_recently": visited,
             "topics": sorted(topics.items(), key=lambda kv: -kv[1])[:14],
             "years": sorted(years.items()),

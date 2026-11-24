@@ -20,7 +20,7 @@ PROFILE_CAP = 600
 # Folder-path tokens that are containers, not topics.
 NOISE = {"Bookmarks bar", "Other bookmarks", "Mobile bookmarks", "Imported From Firefox",
          "unfiled", "Imported", "menu", "toolbar", "BookmarksBar", "BookmarksMenu",
-         "com.apple.ReadingList", ""}
+         "com.apple.ReadingList", "_Graveyard", ""}
 
 
 def host_of(url: str) -> str:

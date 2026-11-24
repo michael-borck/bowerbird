@@ -131,3 +131,23 @@ def test_chat_reports_api_failures_instead_of_crashing(client, monkeypatch):
     resp = client.post("/api/chat", json={"question": "hi"})
     assert resp.status_code == 502
     assert "Connection error" in resp.json()["detail"]
+
+
+def test_topics_chart_falls_back_to_folders(client):
+    summary = client.get("/api/summary").json()
+    assert summary["topics_source"] == "folders"
+    assert summary["topics"] == [["Bar", 3]]       # "_Graveyard" is a container, not a topic
+
+
+def test_topics_chart_counts_child_categories_towards_their_parent(client, conn):
+    conn.executemany("INSERT INTO categories(id, path) VALUES(?,?)",
+                     [(1, "Printing"), (2, "Printing / Filament"), (3, "Teaching")])
+    conn.executemany("INSERT INTO urls(id, canonical_url, check_url) VALUES(?,?,?)",
+                     [(1, "https://e.com/a", "https://e.com/a"), (2, "https://e.com/b", "https://e.com/b")])
+    conn.executemany("INSERT INTO url_categories(url_id, category_id) VALUES(?,?)",
+                     [(1, 2), (1, 3), (2, 1), (2, 2)])
+    conn.commit()
+
+    summary = client.get("/api/summary").json()
+    assert summary["topics_source"] == "llm"
+    assert summary["topics"] == [["Printing", 2], ["Teaching", 1]]

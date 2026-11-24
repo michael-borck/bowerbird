@@ -193,7 +193,7 @@
       </div>
       <div class="grid two section">
         <div class="card">
-          <p class="eyebrow">Topics · from your folders, pre-LLM</p>
+          <p class="eyebrow" id="topics-eyebrow">Topics</p>
           <div id="topics"></div>
         </div>
         <div>
@@ -371,6 +371,8 @@ async function loadSummary() {
     `<span class="key"><span class="swatch" style="background:${STATUS_META[k][1]}"></span>` +
     `${STATUS_META[k][0]} <span class="n">${fmt(sc[k])}</span></span>`).join("");
 
+  $("#topics-eyebrow").textContent =
+    s.topics_source === "llm" ? "Topics · from the model's categories" : "Topics · from your folders";
   bars($("#topics"), s.topics);
   bars($("#domains"), s.domains);
   $("#sources").innerHTML = s.sources.map(src => `
