@@ -122,6 +122,7 @@ def create_app(db_path: Path | None = None) -> FastAPI:
             "last_checked": checked_at,
             "unreachable_confirmed": unreachable,
             "topics_source": "llm" if cat_topics else "folders",
+            "history_note": db.history_note(conn),
             "visited_recently": visited,
             "topics": sorted(topics.items(), key=lambda kv: -kv[1])[:14],
             "years": sorted(years.items()),

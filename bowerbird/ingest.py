@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .canonical import canonicalize, is_checkable
+from .db import record_history_window
 
 _CHROME_EPOCH = datetime(1601, 1, 1, tzinfo=timezone.utc)
 _UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -186,6 +187,7 @@ def ingest_source(conn: sqlite3.Connection, source: sqlite3.Row) -> dict:
 
     # Firefox places carries visit data — fold it into the history table.
     if source["kind"] == "firefox":
+        last_used = [bm["date_last_used"] for bm in found if bm["date_last_used"]]
         for bm in found:
             if bm["date_last_used"]:
                 conn.execute(
@@ -194,6 +196,10 @@ def ingest_source(conn: sqlite3.Connection, source: sqlite3.Row) -> dict:
                        ON CONFLICT(url) DO UPDATE SET last_visit=MAX(last_visit, excluded.last_visit)""",
                     (bm["url"], canonicalize(bm["url"]), bm["date_last_used"]),
                 )
+        if last_used:
+            # A bookmarked page keeps its last-visit date for as long as it is
+            # bookmarked, so this is "ever visited", not a 90-day window.
+            record_history_window(conn, source["browser"], None, max(last_used))
 
     stats = {"source": f"{source['browser']}/{source['profile']}",
              "found": len(found), "new": new, "updated": updated, "marked_removed": gone}
@@ -231,18 +237,39 @@ def ingest_chromium_history(conn: sqlite3.Connection, source: sqlite3.Row) -> di
         shutil.copy2(history_file, copy)
         hist = sqlite3.connect(f"file:{copy}?mode=ro", uri=True)
         try:
+            oldest, newest = hist.execute(
+                "SELECT MIN(last_visit_time), MAX(last_visit_time) FROM urls WHERE visit_count > 0"
+            ).fetchone()
             rows = hist.execute(
                 "SELECT url, visit_count, last_visit_time FROM urls WHERE visit_count > 0"
             ).fetchall()
         finally:
             hist.close()
+
+    record_history_window(conn, source["browser"], chrome_ts_to_iso(oldest), chrome_ts_to_iso(newest))
+    # Only visits to bookmarked pages are kept: the rest of the browsing history
+    # is no one's business, and nothing here reads it.
+    bookmarked = {r[0] for r in conn.execute(
+        "SELECT DISTINCT canonical_url FROM bookmarks WHERE removed=0")}
+    kept = 0
     for url, visits, last_visit in rows:
+        canonical = canonicalize(url)
+        if canonical not in bookmarked:
+            continue
         conn.execute(
             """INSERT INTO history(url, canonical_url, visit_count, last_visit) VALUES(?,?,?,?)
                ON CONFLICT(url) DO UPDATE SET
-                   visit_count = MAX(visit_count, excluded.visit_count),
-                   last_visit = MAX(COALESCE(last_visit,''), COALESCE(excluded.last_visit,''))""",
-            (url, canonicalize(url), visits, chrome_ts_to_iso(last_visit)),
+                    visit_count = MAX(visit_count, excluded.visit_count),
+                    last_visit = MAX(COALESCE(last_visit,''), COALESCE(excluded.last_visit,''))""",
+            (url, canonical, visits, chrome_ts_to_iso(last_visit)),
         )
+        kept += 1
     conn.commit()
-    return {"history_rows": len(rows)}
+    return {"history_rows": kept}
+
+
+def prune_history(conn: sqlite3.Connection) -> None:
+    """Forget visits to pages that are no longer bookmarked."""
+    conn.execute("DELETE FROM history WHERE canonical_url NOT IN "
+                 "(SELECT canonical_url FROM bookmarks WHERE removed=0)")
+    conn.commit()

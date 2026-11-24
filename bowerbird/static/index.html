@@ -358,9 +358,9 @@ async function loadSummary() {
       <div class="note">+${fmt(unreachable)} on unreachable hosts</div></div>
     <div class="card tile"><div class="label">Login-walled</div><div class="value">${fmt(sc.login_wall||0)}</div>
       <div class="note">login page reached — counted alive</div></div>
-    <div class="card tile"><div class="label">Never revisited</div>
+    <div class="card tile"><div class="label">Not visited recently</div>
       <div class="value">${s.total_bookmarks ? Math.round(100*(1 - s.visited_recently/s.total_bookmarks)) : 0}%</div>
-      <div class="note">${fmt(s.visited_recently)} visited in recent browser history</div></div>`;
+      <div class="note">${fmt(s.visited_recently)} with a recorded visit · ${esc(s.history_note)}</div></div>`;
 
   $("#health-eyebrow").textContent = `Link health · ${fmt(checked)} unique URLs checked`;
   const order = ["live","login_wall","blocked","suspect","dead","timeout","error","unchecked"];

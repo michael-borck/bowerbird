@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from .db import history_note
+
 ALIVE = ("live", "login_wall")
 
 
@@ -40,7 +42,7 @@ def build_report(conn: sqlite3.Connection, out: Path | None = None) -> str:
         f"- Unique URLs after canonicalisation: **{unique:,}** "
         f"(**{dupes:,}** duplicate bookmark entries collapse)",
         f"- Checked so far: **{checked:,}** of {unique:,}",
-        f"- Bookmarks visited in Brave's recent history: **{visited:,}**",
+        f"- Bookmarks with a recorded visit: **{visited:,}** ({history_note(conn)})",
         "",
         "## Link health",
     ]

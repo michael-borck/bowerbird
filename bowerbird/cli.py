@@ -10,7 +10,7 @@ from pathlib import Path
 
 from . import db
 from .checker import run_check
-from .ingest import ingest_chromium_history, ingest_source
+from .ingest import ingest_chromium_history, ingest_source, prune_history
 from .report import build_report
 from .sources import detect, register
 
@@ -23,16 +23,29 @@ def ingest_all(conn: sqlite3.Connection, source_id: int | None = None, history: 
     """
     rows = conn.execute(
         "SELECT * FROM sources" + (f" WHERE id={int(source_id)}" if source_id else "")).fetchall()
+    reported = []
     for source in rows:
         try:
             stats = ingest_source(conn, source)
-            if source["kind"] == "chromium" and history and "error" not in stats:
-                stats |= ingest_chromium_history(conn, source)
         except Exception as exc:
             conn.rollback()
             stats = {"source": f"{source['browser']}/{source['profile']}",
                      "error": f"{type(exc).__name__}: {exc}"[:200]}
+        reported.append((source, stats))
+
+    if history:
+        # Once every store is in, a visit counts for a bookmark saved in another browser.
+        for source, stats in reported:
+            if source["kind"] == "chromium" and "error" not in stats:
+                try:
+                    stats |= ingest_chromium_history(conn, source)
+                except Exception as exc:
+                    conn.rollback()
+                    stats["history_error"] = f"{type(exc).__name__}: {exc}"[:200]
+
+    for _, stats in reported:
         print(json.dumps(stats))
+    prune_history(conn)
 
 
 def main() -> None:

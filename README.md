@@ -78,7 +78,7 @@ written by the explicit `bowerbird writeback --apply`, and backed up first.
 |---|---|
 | `bowerbird sync` | one-shot incremental update: ingest → check → enrich → categorise → index |
 | `bowerbird sources` | detect and register installed browsers |
-| `bowerbird ingest` | import bookmarks + history (read-only, reconciling) |
+| `bowerbird ingest` | import bookmarks, plus visit dates for bookmarked pages (read-only, reconciling) |
 | `bowerbird check` | validate links (`--recheck` to re-probe) |
 | `bowerbird enrich` | fetch page titles/descriptions/text for search |
 | `bowerbird categorize --taxonomy` / `--assign` | two-pass LLM categorisation |

@@ -9,6 +9,7 @@ Two-layer model (bowerbird's Candidate/Resource split):
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from pathlib import Path
@@ -111,6 +112,11 @@ CREATE TABLE IF NOT EXISTS url_categories (
     PRIMARY KEY (url_id, category_id)
 );
 CREATE INDEX IF NOT EXISTS idx_url_categories_cat ON url_categories(category_id);
+
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 FTS_SCHEMA = """
@@ -214,3 +220,31 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     conn.executescript(FTS_SCHEMA)
     _migrate(conn)
     return conn
+
+
+def meta_get(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
+    row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+    return row[0] if row else default
+
+
+def meta_set(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute("INSERT INTO meta(key, value) VALUES(?,?) "
+                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+
+
+def record_history_window(conn: sqlite3.Connection, browser: str,
+                          first: str | None, last: str | None) -> None:
+    """Remember how far back a browser's visit records go (`first` is None when
+    they are not time-limited)."""
+    windows = json.loads(meta_get(conn, "history_windows", "{}"))
+    windows[browser] = {"first": first, "last": last}
+    meta_set(conn, "history_windows", json.dumps(windows))
+
+
+def history_note(conn: sqlite3.Connection) -> str:
+    """One line on what "visited" can mean here, for the dashboard and the report."""
+    windows = json.loads(meta_get(conn, "history_windows", "{}"))
+    parts = [f"{browser} history back to {w['first'][:10]}" if w.get("first")
+             else f"{browser}: any visit on record"
+             for browser, w in sorted(windows.items())]
+    return " · ".join(parts) if parts else "no browser history ingested yet"

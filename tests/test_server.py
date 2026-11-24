@@ -151,3 +151,14 @@ def test_topics_chart_counts_child_categories_towards_their_parent(client, conn)
     summary = client.get("/api/summary").json()
     assert summary["topics_source"] == "llm"
     assert summary["topics"] == [["Printing", 2], ["Teaching", 1]]
+
+
+def test_summary_says_what_history_it_has(client, conn):
+    assert client.get("/api/summary").json()["history_note"] == "no browser history ingested yet"
+
+    db.record_history_window(conn, "Brave", "2026-05-12T00:00:00+00:00", "2026-08-10T00:00:00+00:00")
+    db.record_history_window(conn, "Firefox", None, "2026-08-01T00:00:00+00:00")
+    conn.commit()
+
+    assert client.get("/api/summary").json()["history_note"] == (
+        "Brave history back to 2026-05-12 · Firefox: any visit on record")

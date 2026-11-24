@@ -82,3 +82,74 @@ def test_a_source_that_fails_does_not_stop_the_others_and_recovers(tmp_path, mon
     cli.main()
     conn = sqlite3.connect(db_path)
     assert conn.execute("SELECT COUNT(*) FROM bookmarks").fetchone()[0] == 4
+
+
+STAMP = 13300000000000000                 # Chrome timestamps: microseconds since 1601
+DAY = 86_400 * 1_000_000
+
+
+def chromium_history(path, *visits):
+    """A Chromium History file: (url, visit_count, last_visit_time)."""
+    hist = sqlite3.connect(path)
+    hist.execute("CREATE TABLE urls (url TEXT PRIMARY KEY, visit_count INTEGER, last_visit_time INTEGER)")
+    hist.executemany("INSERT INTO urls VALUES(?,?,?)", visits)
+    hist.commit()
+    hist.close()
+    return path
+
+
+def test_only_visits_to_bookmarked_pages_are_kept(tmp_path):
+    conn = db.connect(tmp_path / "test.db")
+    bookmarks = chromium_file(tmp_path / "Bookmarks", "https://e.com/kept")
+    chromium_history(tmp_path / "History",
+                     ("https://e.com/kept?utm_source=x", 3, STAMP),        # the bookmark, with tracking
+                     ("https://e.com/private-search", 9, STAMP + DAY),     # nobody's business
+                     ("https://e.com/never-opened", 0, 0))
+    conn.execute("INSERT INTO sources(id, kind, browser, profile, path) "
+                 "VALUES(1,'chromium','Brave','Test',?)", (str(bookmarks),))
+    conn.commit()
+    source = conn.execute("SELECT * FROM sources").fetchone()
+    ingest_source(conn, source)
+
+    assert ingest.ingest_chromium_history(conn, source) == {"history_rows": 1}
+    assert [tuple(r) for r in conn.execute("SELECT url, visit_count FROM history")] == [
+        ("https://e.com/kept?utm_source=x", 3)]
+    assert db.history_note(conn) == f"Brave history back to {chrome_ts_to_iso(STAMP)[:10]}"
+
+
+def test_visits_to_pages_no_longer_bookmarked_are_dropped(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "detect", lambda: [])
+    bookmarks = chromium_file(tmp_path / "Bookmarks", "https://e.com/kept")
+    db_path = tmp_path / "cli.db"
+    conn = db.connect(db_path)
+    conn.execute("INSERT INTO sources(id, kind, browser, profile, path) "
+                 "VALUES(1,'chromium','Brave','Test',?)", (str(bookmarks),))
+    conn.executemany("INSERT INTO history(url, canonical_url, visit_count) VALUES(?,?,1)",
+                     [("https://e.com/kept", "https://e.com/kept"), ("https://e.com/gone", "https://e.com/gone")])
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr("sys.argv", ["bowerbird", "--db", str(db_path), "ingest", "--no-history"])
+    cli.main()
+
+    conn = sqlite3.connect(db_path)
+    assert [r[0] for r in conn.execute("SELECT url FROM history")] == ["https://e.com/kept"]
+
+
+def test_a_visit_counts_for_a_bookmark_saved_in_a_later_source(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "detect", lambda: [])
+    first = chromium_file(tmp_path / "first", "https://e.com/mine")
+    second = chromium_file(tmp_path / "second", "https://e.com/theirs")
+    chromium_history(tmp_path / "History", ("https://e.com/theirs", 2, STAMP))
+    db_path = tmp_path / "cli.db"
+    conn = db.connect(db_path)
+    conn.executemany("INSERT INTO sources(id, kind, browser, profile, path) VALUES(?,'chromium',?,'Test',?)",
+                     [(1, "Brave", str(first)), (2, "Chrome", str(second))])
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr("sys.argv", ["bowerbird", "--db", str(db_path), "ingest"])
+    cli.main()
+
+    conn = sqlite3.connect(db_path)
+    assert [r[0] for r in conn.execute("SELECT url FROM history")] == ["https://e.com/theirs"]
