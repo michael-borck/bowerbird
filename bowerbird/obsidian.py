@@ -1,12 +1,12 @@
 """Obsidian export — a drop-in folder for an existing vault.
 
 Layout:
-  <out>/Bower.md                     index note
+  <out>/Bowerbird.md                 index note
   <out>/topics/<Topic - Child>.md    one note per category, listing its links
   <out>/bookmarks/<title>.md         stub per bookmark: frontmatter + [[topic]] links
 
 Stubs give Obsidian's graph view and Dataview something to chew on; topic notes
-are the human-browsable layer. Bower only ever writes inside <out>.
+are the human-browsable layer. bowerbird only ever writes inside <out>.
 """
 
 from __future__ import annotations
@@ -61,8 +61,9 @@ def export(conn: sqlite3.Connection, out: Path) -> dict:
             by_topic[t].append(r)
 
         base = _safe(r["title"] or r["check_url"])
-        used_names[base] = used_names.get(base, 0) + 1
-        fname = base if used_names[base] == 1 else f"{base} ({r['id']})"
+        # Counted without case: on a Mac, "Readme.md" would land on top of "README.md".
+        count = used_names[base.casefold()] = used_names.get(base.casefold(), 0) + 1
+        fname = base if count == 1 else f"{base} ({r['id']})"
         wikilinks = " ".join(f"[[{_topic_file(t)}]]" for t in topics)
         front = [
             "---",
@@ -92,13 +93,13 @@ def export(conn: sqlite3.Connection, out: Path) -> dict:
         (topics_dir / f"{_topic_file(topic)}.md").write_text("\n".join(lines) + "\n")
 
     top_level = sorted({t.split(" / ")[0] for t in by_topic})
-    index = ["# Bower — bookmark collection", "",
+    index = ["# Bowerbird — bookmark collection", "",
              f"{written} bookmarks across {len(by_topic)} topics.", ""]
     for top in top_level:
         index.append(f"## {top}")
         for t in sorted(t for t in by_topic if t == top or t.startswith(top + " / ")):
             index.append(f"- [[{_topic_file(t)}]] ({len(by_topic[t])})")
         index.append("")
-    (out / "Bower.md").write_text("\n".join(index))
+    (out / "Bowerbird.md").write_text("\n".join(index))
 
     return {"bookmarks": written, "topics": len(by_topic), "out": str(out)}

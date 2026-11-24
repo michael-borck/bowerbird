@@ -150,7 +150,7 @@ def writeback(conn: sqlite3.Connection, source_id: int, apply: bool = False) -> 
     backup = backup_dir / f"{source['browser']}-{source['profile']}-Bookmarks-{stamp}.json"
     shutil.copy2(path, backup)
 
-    tmp = path.with_suffix(".bower-tmp")
+    tmp = path.with_suffix(".bowerbird-tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=3))
     tmp.replace(path)
     # Brave also keeps Bookmarks.bak; leave it — it's the browser's own fallback.

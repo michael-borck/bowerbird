@@ -34,7 +34,7 @@ def build_report(conn: sqlite3.Connection, out: Path | None = None) -> str:
     ).fetchone()["c"]
 
     lines = [
-        "# Bower audit report",
+        "# Bowerbird audit report",
         f"_Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
         "",
         "## Totals",

@@ -1,4 +1,4 @@
-"""Bower CLI: sources, ingest, check, report, stats, serve."""
+"""Bowerbird's command line."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def ingest_all(conn: sqlite3.Connection, source_id: int | None = None, history: 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="bower", description="Bookmark audit and dashboard")
+    parser = argparse.ArgumentParser(prog="bowerbird", description="Bookmark audit and dashboard")
     parser.add_argument("--db", type=Path, default=None, help="database path")
     sub = parser.add_subparsers(dest="cmd", required=True)
 

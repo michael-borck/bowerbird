@@ -46,6 +46,8 @@ bowerbird serve   # dashboard at http://127.0.0.1:8420
 ## Requirements
 
 - macOS (browser profile discovery is macOS-path based for now)
+- Full Disk Access for the terminal, to read Safari's bookmarks; without it
+  Safari is skipped
 - Python 3.12+
 - An LLM API for the categorisation and Ask features — an Anthropic API key
   (`ANTHROPIC_API_KEY`), or any OpenAI-compatible endpoint (see Configuration).

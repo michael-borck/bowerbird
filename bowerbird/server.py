@@ -1,4 +1,4 @@
-"""Bower's local web server — FastAPI on 127.0.0.1, UI at /, JSON under /api."""
+"""Bowerbird's local web server — FastAPI on 127.0.0.1, UI at /, JSON under /api."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def topic_of(folder_path: str) -> str:
 
 
 def create_app(db_path: Path | None = None) -> FastAPI:
-    app = FastAPI(title="Bower", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Bowerbird", docs_url=None, redoc_url=None)
     # The dashboard holds the whole collection, so it answers only to its own
     # hostnames: a page using DNS rebinding arrives under some other name.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(LOCAL_HOSTS))

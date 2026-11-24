@@ -1,16 +1,14 @@
 """Two-pass LLM categorisation (cabinet's design, with its roadmap lesson applied).
 
-Pass A (`derive_taxonomy`): one Claude Opus call looks at the existing folder
-structure plus a sample of the corpus and produces a clean, fixed taxonomy —
-deriving the taxonomy *before* assigning anything prevents the synonym-sprawl
-failure mode ("Finance" vs "Finances") that grows batch by batch.
+Pass A (`derive_taxonomy`): one call to the taxonomy model looks at the existing
+folder structure plus a sample of the corpus and produces a clean, fixed
+taxonomy — deriving the taxonomy *before* assigning anything prevents the
+synonym-sprawl failure mode ("Finance" vs "Finances") that grows batch by batch.
 
 Pass B (`assign`): batches of bookmarks are matched against that fixed taxonomy
-with structured outputs. Assignments record their source and model so a better
-model can later redo only machine-made labels. Manual assignments are never
-overwritten. A URL the model has already judged is not sent again, whether or
-not it found a category for it; only a batch the provider failed to answer is
-retried.
+with structured outputs, and every assignment records the model that made it.
+A URL the model has already judged is not sent again, whether or not it found
+a category for it; only a batch the provider failed to answer is retried.
 """
 
 from __future__ import annotations
@@ -138,7 +136,7 @@ def assign(conn: sqlite3.Connection, model: str | None = None,
     model = assign_model(model)
     valid_paths = {r["path"] for r in conn.execute("SELECT path FROM categories")}
     if not valid_paths:
-        raise RuntimeError("no taxonomy — run `bower categorize --taxonomy` first")
+        raise RuntimeError("no taxonomy — run `bowerbird categorize --taxonomy` first")
     system = _system_prompt(conn)
 
     rows = conn.execute(

@@ -15,10 +15,12 @@ from datetime import datetime, timezone
 
 import httpx
 
+from . import __version__
 from .db import FAILED
 
 API = "https://archive.org/wayback/available"
 REQUEST_INTERVAL = 4.0
+USER_AGENT = f"bowerbird/{__version__} (bookmark auditor; https://github.com/michael-borck/bowerbird)"
 
 
 async def run_wayback(conn: sqlite3.Connection, limit: int | None = None,
@@ -34,7 +36,7 @@ async def run_wayback(conn: sqlite3.Connection, limit: int | None = None,
 
     found = done = throttled = 0
     async with httpx.AsyncClient(timeout=20.0,
-                                 headers={"User-Agent": "bower/0.1 (bookmark auditor; contact via github)"}) as client:
+                                 headers={"User-Agent": USER_AGENT}) as client:
         for row in rows:
             snapshot_url = snapshot_ts = None
             answered = False
