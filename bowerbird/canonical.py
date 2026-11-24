@@ -12,6 +12,7 @@ bookmark.
 from __future__ import annotations
 
 import ipaddress
+import socket
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 TRACKING_PARAMS = {
@@ -35,6 +36,23 @@ def _port(parts):
         return _UNUSABLE
 
 
+def _address(host: str):
+    """The IP address a host literal stands for, or None when it is a name.
+
+    inet_aton is asked first because it accepts the shorthand browsers also
+    accept — 127.1, 0x7f000001 and 2130706433 are all 127.0.0.1 — and
+    ipaddress covers IPv6.
+    """
+    try:
+        return ipaddress.IPv4Address(socket.inet_aton(host))
+    except (OSError, ipaddress.AddressValueError):
+        pass
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        return None
+
+
 def is_checkable(url: str) -> bool:
     """http(s) URLs pointing at a public host that a client can actually request."""
     if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in url):
@@ -48,12 +66,8 @@ def is_checkable(url: str) -> bool:
     host = (parts.hostname or "").lower()
     if not host or host == "localhost" or host.endswith(".local"):
         return False
-    try:
-        if ipaddress.ip_address(host).is_private or ipaddress.ip_address(host).is_loopback:
-            return False
-    except ValueError:
-        pass  # not an IP literal — a normal hostname
-    return True
+    address = _address(host)
+    return address is None or address.is_global
 
 
 def canonicalize(url: str) -> str:

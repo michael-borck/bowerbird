@@ -51,6 +51,14 @@ def test_is_checkable():
     assert not is_checkable("http://localhost:3000")
     assert not is_checkable("http://192.168.1.10/admin")
     assert not is_checkable("file:///Users/me/doc.html")
+    assert is_checkable("https://8.8.8.8/") and is_checkable("https://[2606:4700:4700::1111]/")
+
+
+def test_addresses_that_are_not_public_are_not_checkable_however_they_are_written():
+    # 127.1, 0x7f000001 and 2130706433 are all 127.0.0.1; 100.64.0.0/10 is shared address space
+    for url in ["http://127.1/", "http://0x7f000001/", "http://2130706433/", "http://100.64.0.1/",
+                "http://169.254.169.254/latest/meta-data/", "http://[::1]/", "http://0.0.0.0/"]:
+        assert not is_checkable(url), url
 
 
 def test_urls_no_client_can_request_are_not_checkable():
