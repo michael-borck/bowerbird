@@ -259,6 +259,7 @@
       <h1>Domain triage</h1>
       <p class="h-sub" id="dom-sub">One decision retires a whole domain. “Let go” marks every unreviewed link on the domain retired (applied at write-back, reversible until then); “Keep” records them as deliberate.</p>
       <div class="card" id="dom-rows"></div>
+      <p class="h-sub" id="dom-msg" role="status"></p>
     </section>
 
     <section class="screen" id="topicmap">
@@ -274,6 +275,7 @@
       <p class="h-sub" id="grave-sub"></p>
       <div class="facets" id="grave-bulk"></div>
       <div class="card" id="grave-rows"></div>
+      <p class="h-sub" id="grave-msg" role="status"></p>
       <p class="h-sub" style="margin-top:10px">“Replace” swaps the link for its Wayback snapshot, “Let go” retires it — both are recorded decisions applied at write-back, never silently. A link that could not be reached only shows up here once it has failed twice, on checks at least six hours apart. Run <code>bowerbird wayback</code> to look up snapshots, and <code>bowerbird writeback --source-id 1</code> for a dry-run of the changes.</p>
     </section>
 
@@ -298,7 +300,22 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = (n) => (n ?? 0).toLocaleString("en-AU");
-const short = (u) => u.replace(/^https?:\/\/(www\.)?/, "").slice(0, 80);
+const short = (u) => String(u ?? "").replace(/^https?:\/\/(www\.)?/, "").slice(0, 80);
+// Only http(s) URLs become links. Anything else — a javascript: bookmarklet, a
+// file:// path — is shown as text: following it from here is never what was meant.
+const link = (url, text) => /^https?:\/\//i.test(url || "")
+  ? `<a href="${esc(url)}" target="_blank" rel="noopener">${text}</a>` : text;
+
+// Send a decision to the server; if it is refused, throw with the server's reason
+// rather than letting the caller carry on as if it had worked.
+async function post(url, body) {
+  const resp = await fetch(url, { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (resp.ok) return resp.json();
+  const detail = (await resp.json().catch(() => null))?.detail;
+  const why = Array.isArray(detail) ? detail.map(d => d.msg).join("; ") : detail;
+  throw new Error(typeof why === "string" && why ? why : resp.statusText);
+}
 
 const STATUS_META = {
   live:       ["✓ Live",              "var(--st-live)"],
@@ -404,7 +421,7 @@ async function loadLibrary(reset) {
   if (libFilters.topic) p.set("topic", libFilters.topic);
   const data = await (await fetch("/api/bookmarks?" + p)).json();
   const html = data.rows.map(r => `
-    <tr><td><span class="t"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a></span>
+    <tr><td><span class="t">${link(r.url, esc(r.title || r.url))}</span>
         <span class="u">${esc(short(r.url))}</span></td>
       <td>${(r.topics || [r.topic]).slice(0,3).map(t => `<span class="topic">${esc(t)}</span>`).join("")}</td>
       <td class="num">${esc(r.browser)}</td>
@@ -416,7 +433,11 @@ async function loadLibrary(reset) {
   $("#lib-sub").textContent = `${fmt(data.total)} matching · showing ${fmt(libOffset)}`;
 }
 
+// Show a refused request under the list it concerns; the loader clears it next time.
+function say(selector, err) { $(selector).textContent = err ? "Not saved: " + err.message : ""; }
+
 async function loadGraveyard() {
+  say("#grave-msg");
   const data = await (await fetch("/api/graveyard")).json();
   const c = data.counts;
   $("#grave-sub").textContent =
@@ -425,37 +446,37 @@ async function loadGraveyard() {
     `${fmt(data.reviewed)} reviewed so far` +
     (data.pending ? ` · ${fmt(data.pending)} unreachable links waiting on a second check` : "");
   $("#grave-bulk").innerHTML =
-    (data.snapshots ? `<button class="btn sm primary" onclick="bulk('replace_snapshots')">Replace all with Wayback snapshots (${fmt(data.snapshots)})</button>` : "") +
-    (data.no_snapshot ? `<button class="btn sm" onclick="bulk('let_go_no_snapshot')">Let go all without a snapshot (${fmt(data.no_snapshot)})</button>` : "");
+    (data.snapshots ? `<button class="btn sm primary" data-scope="replace_snapshots">Replace all with Wayback snapshots (${fmt(data.snapshots)})</button>` : "") +
+    (data.no_snapshot ? `<button class="btn sm" data-scope="let_go_no_snapshot">Let go all without a snapshot (${fmt(data.no_snapshot)})</button>` : "");
+  document.querySelectorAll("#grave-bulk [data-scope]").forEach(b =>
+    b.addEventListener("click", () => bulk(b.dataset.scope)));
   $("#grave-rows").innerHTML = data.rows.map(r => `
     <div class="grave-row" id="grave-${r.id}">
       <div>
-        <span class="grave-title"><a href="${esc(r.check_url)}" target="_blank" rel="noopener">${esc(r.title || r.check_url)}</a></span>
+        <span class="grave-title">${link(r.check_url, esc(r.title || r.check_url))}</span>
         <span class="grave-url">${esc(short(r.check_url))}</span>
         <div class="grave-meta">${PILL_LABEL[r.status]}${r.http_status ? " · HTTP " + r.http_status : ""}` +
         `${r.reason ? " · " + esc(r.reason.slice(0,90)) : ""} · <span class="topic">${esc(r.topic)}</span>` +
-        `${r.wayback_url ? ` · <a href="${esc(r.wayback_url)}" target="_blank" rel="noopener">◷ snapshot ${r.wayback_at ? esc(r.wayback_at.slice(0,4)) : ""}</a>` : ""}</div>
+        `${r.wayback_url ? ` · ${link(r.wayback_url, "◷ snapshot " + (r.wayback_at ? esc(r.wayback_at.slice(0,4)) : ""))}` : ""}</div>
       </div>
       <div class="actions">
-        ${r.wayback_url ? `<button class="btn sm primary" onclick="review(${r.id},'replace')">Replace</button>` : ""}
-        <button class="btn sm" onclick="review(${r.id},'keep')">Keep</button>
-        <button class="btn sm" onclick="review(${r.id},'let_go')">Let go</button>
+        ${r.wayback_url ? `<button class="btn sm primary" data-url="${r.id}" data-review="replace">Replace</button>` : ""}
+        <button class="btn sm" data-url="${r.id}" data-review="keep">Keep</button>
+        <button class="btn sm" data-url="${r.id}" data-review="let_go">Let go</button>
       </div>
     </div>`).join("") || "<p class='h-sub'>Queue is empty — everything has been reviewed. 🎉</p>";
+  document.querySelectorAll("#grave-rows [data-review]").forEach(b =>
+    b.addEventListener("click", () => review(Number(b.dataset.url), b.dataset.review)));
 }
 
 async function bulk(scope) {
-  const resp = await fetch("/api/graveyard/bulk", { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope }) });
-  const data = await resp.json();
-  await loadGraveyard();
+  try { await post("/api/graveyard/bulk", { scope }); await loadGraveyard(); }
+  catch (err) { say("#grave-msg", err); }
 }
 
 async function review(id, decision) {
-  await fetch(`/api/urls/${id}/review`, { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) });
-  const row = document.getElementById("grave-" + id);
-  if (row) row.remove();
+  try { await post(`/api/urls/${id}/review`, { decision }); await loadGraveyard(); }
+  catch (err) { say("#grave-msg", err); }
 }
 
 async function loadTopicTree() {
@@ -494,17 +515,14 @@ async function askQuestion() {
   if (!question) return;
   $("#ask-out").innerHTML = "<p class='h-sub'>Searching your bookmarks…</p>";
   try {
-    const resp = await fetch("/api/chat", { method: "POST",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
-    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
-    const data = await resp.json();
+    const data = await post("/api/chat", { question });
     $("#ask-out").innerHTML =
       data.groups.map(g => `
         <div class="card section">
           <p class="eyebrow">${esc(g.theme)}</p>
           ${g.items.map(it => `
             <div class="grave-row"><div>
-              <span class="grave-title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a></span>
+              <span class="grave-title">${link(it.url, esc(it.title))}</span>
               <span class="grave-url">${esc(short(it.url))}</span>
               <div class="grave-meta">${esc(it.why)}${it.status && it.status !== "live" ? ` · <span class="pill ${esc(it.status)}"><span class="sdot"></span>${PILL_LABEL[it.status]}</span>` : ""}</div>
             </div></div>`).join("")}
@@ -517,6 +535,7 @@ async function askQuestion() {
 }
 
 async function loadDomains() {
+  say("#dom-msg");
   const data = await (await fetch("/api/domains")).json();
   $("#dom-rows").innerHTML = data.domains.map(d => `
     <div class="grave-row" id="dom-${esc(d.domain).replace(/[^a-z0-9]/gi,'_')}">
@@ -527,16 +546,17 @@ async function loadDomains() {
         <div class="grave-meta" style="color:var(--ink-2)">${d.samples.map(esc).join(" · ")}</div>
       </div>
       <div class="actions">
-        <button class="btn sm" onclick="domainReview('${esc(d.domain)}','keep')">Keep all</button>
-        <button class="btn sm" onclick="domainReview('${esc(d.domain)}','let_go')">Let go all</button>
+        <button class="btn sm" data-domain="${esc(d.domain)}" data-decision="keep">Keep all</button>
+        <button class="btn sm" data-domain="${esc(d.domain)}" data-decision="let_go">Let go all</button>
       </div>
     </div>`).join("") || "<p class='h-sub'>Every domain with 3+ links has been reviewed. 🎉</p>";
+  document.querySelectorAll("#dom-rows [data-domain]").forEach(b =>
+    b.addEventListener("click", () => domainReview(b.dataset.domain, b.dataset.decision)));
 }
 
 async function domainReview(domain, decision) {
-  await fetch("/api/domains/review", { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain, decision }) });
-  loadDomains();
+  try { await post("/api/domains/review", { domain, decision }); await loadDomains(); }
+  catch (err) { say("#dom-msg", err); }
 }
 
 async function loadTopicMap() {
@@ -627,7 +647,7 @@ async function loadDupes() {
   $("#dupes-rows").innerHTML = data.groups.map(g => `
     <div class="grave-row">
       <div>
-        <span class="grave-title"><a href="${esc(g.keep.url)}" target="_blank" rel="noopener">${esc(g.keep.title || g.keep.url)}</a></span>
+        <span class="grave-title">${link(g.keep.url, esc(g.keep.title || g.keep.url))}</span>
         <span class="grave-url">${esc(short(g.keep.url))}</span>
         <div class="grave-meta">${esc(g.browser)} · ${esc(g.profile)} ·
           keep in <span class="topic">${esc(g.keep.folder_path || "(root)")}</span> ·
@@ -642,7 +662,7 @@ async function loadDeck() {
   $("#deck").innerHTML = data.rows.map(r => `
     <div class="card deckcard">
       <span class="dom">${esc(r.domain)}</span>
-      <span class="dt"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a></span>
+      <span class="dt">${link(r.url, esc(r.title || r.url))}</span>
       <span class="meta">Saved to ${esc(r.folder_path || "(root)")}</span>
       <span><span class="topic">${esc(r.topic)}</span></span>
     </div>`).join("");
